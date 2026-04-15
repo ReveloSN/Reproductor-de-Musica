@@ -118,9 +118,13 @@ class PlaybackController {
     this.elements.expandedModeSummary.textContent = modeSummary;
   }
 
-  updateProgress(): void {
+  updateProgress(fallbackDurationSeconds: number | null = null): void {
     const hasDuration = Number.isFinite(this.audioElement.duration);
-    const duration = hasDuration ? this.audioElement.duration : 0;
+    const duration = hasDuration
+      ? this.audioElement.duration
+      : typeof fallbackDurationSeconds === 'number' && Number.isFinite(fallbackDurationSeconds)
+        ? fallbackDurationSeconds
+        : 0;
     const currentTime = hasDuration ? this.audioElement.currentTime : 0;
 
     this.elements.progressSlider.max = String(Math.max(duration, 1));

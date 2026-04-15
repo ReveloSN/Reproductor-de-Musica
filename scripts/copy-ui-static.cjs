@@ -3,6 +3,16 @@ const path = require('node:path');
 
 const sourceUiDir = path.join(__dirname, '..', 'UI');
 const targetUiDir = path.join(__dirname, '..', 'dist', 'UI');
+const sourceWaveSurferFile = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  'wavesurfer.js',
+  'dist',
+  'wavesurfer.min.js'
+);
+const targetVendorDir = path.join(targetUiDir, 'vendor');
+const targetWaveSurferFile = path.join(targetVendorDir, 'wavesurfer.min.js');
 const ignoredExtensions = new Set(['.ts', '.js', '.map']);
 
 function shouldCopy(fileName) {
@@ -28,3 +38,5 @@ function copyDirectory(sourceDir, destinationDir) {
 }
 
 copyDirectory(sourceUiDir, targetUiDir);
+fs.mkdirSync(targetVendorDir, { recursive: true });
+fs.copyFileSync(sourceWaveSurferFile, targetWaveSurferFile);

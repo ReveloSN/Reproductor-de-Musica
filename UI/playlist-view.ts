@@ -137,6 +137,8 @@ class PlaylistView {
       art.textContent = song.initials;
       art.style.setProperty('--art-start', song.artwork.start);
       art.style.setProperty('--art-end', song.artwork.end);
+      art.style.setProperty('--art-image', song.artworkDataUrl ? `url("${song.artworkDataUrl}")` : 'none');
+      art.classList.toggle('has-artwork-image', Boolean(song.artworkDataUrl));
 
       titleCell.className = 'playlist-title';
       titleRow.className = 'playlist-title-row';
@@ -149,15 +151,23 @@ class PlaylistView {
       }
 
       path.className = 'playlist-path';
-      path.textContent = `${song.artist} | ${song.sourceLabel}`;
-      path.title = `${song.artist} | ${song.sourceLabel}`;
+      path.textContent = song.album ? `${song.artist} • ${song.album}` : song.artist;
+      path.title = path.textContent;
 
       metaCell.className = 'playlist-meta';
       meta.className = 'playlist-detail-text';
-      meta.textContent = summarizePath(song.path);
+      meta.textContent = song.genre
+        ? `${summarizePath(song.path)} • ${song.genre}`
+        : `${summarizePath(song.path)} • ${song.extension}`;
       meta.title = song.path;
       status.className = 'playlist-status';
-      status.textContent = isPlayingSong ? 'Sonando' : song.isFavorite ? 'Favorita' : song.extension;
+      status.textContent = isPlayingSong
+        ? 'Sonando'
+        : song.isFavorite
+          ? 'Favorita'
+          : song.trackNumber
+            ? `Pista ${song.trackNumber}`
+            : song.extension;
 
       duration.className = 'playlist-duration';
       duration.textContent = song.durationText;

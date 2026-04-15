@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const elements = window.createRendererElements(document);
   const playlistView = new window.PlaylistView(document, elements);
+  const waveformController = new window.WaveformController(elements, elements.audioElement);
   const nowPlayingView = new window.NowPlayingView(elements, {
     lyricsService,
     translationService,
@@ -128,8 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function wireEvents(): void {
+    window.addEventListener('beforeunload', () => {
+      waveformController.destroy();
+    });
+
     electronAudioAPI.onMenuAudioFilesSelected((filePaths: string[]) => {
-      addSongsFromPaths(filePaths, 'end');
+      void addSongsFromPaths(filePaths, 'end');
     });
 
     elements.sidebarToggleButton.addEventListener('click', () => {
@@ -498,6 +503,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleAudioError(): void {
     setPlayButtonState(false);
     setPlaybackStatus('Error de audio');
+    waveformController.clearError(
+      'No fue posible renderizar la forma de onda porque el archivo actual fallo al cargarse.'
+    );
     setFeedback(
       'No se pudo reproducir el archivo actual. Verifica el formato o prueba con otra cancion.',
       'error'
@@ -517,20 +525,32 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      addSongsFromPaths(filePaths, mode, position);
+      await addSongsFromPaths(filePaths, mode, position);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setFeedback(`No fue posible abrir el selector de archivos: ${message}`, 'error');
     }
   }
 
-  function addSongsFromPaths(
+  async function addSongsFromPaths(
     filePaths: string[],
     mode: AddSongsMode,
     position: number = getInsertDefaultPosition(),
     playlistId: string = playlistManager.activePlaylistId || 'main'
-  ): void {
-    const { songs, ignoredFiles } = songFactory.createSongsFromPaths(filePaths, playlistManager);
+  ): Promise<void> {
+    setFeedback(`Leyendo metadata de ${filePaths.length} archivo(s)...`);
+    let songs: Track[] = [];
+    let ignoredFiles = 0;
+
+    try {
+      const result = await songFactory.createSongsFromPaths(filePaths, playlistManager);
+      songs = result.songs;
+      ignoredFiles = result.ignoredFiles;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setFeedback(`No fue posible procesar los archivos seleccionados: ${message}`, 'error');
+      return;
+    }
 
     if (songs.length === 0) {
       setFeedback(
@@ -808,7 +828,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return songs.filter((song) => {
-      const searchable = `${song.title} ${song.artist} ${song.path} ${song.extension}`.toLowerCase();
+      const searchable = [
+        song.title,
+        song.artist,
+        song.album || '',
+        song.fileName,
+        song.path,
+        song.extension,
+        song.genre || '',
+        song.sourceLabel,
+      ]
+        .join(' ')
+        .toLowerCase();
       return searchable.includes(searchTerm);
     });
   }
@@ -875,6 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
       elements.playerSongMeta.textContent = 'Selecciona una cancion de la playlist.';
       updateArtwork(elements.heroArtwork, elements.heroArtworkInitials, null);
       updateArtwork(elements.playerArtwork, elements.playerArtworkInitials, null);
+      waveformController.syncSong(null);
       syncNowPlayingView();
       return;
     }
@@ -883,16 +915,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayFileName = window.SongLookupUtils.getDisplayFileName(displaySong) || displaySong.name;
     const favoriteSuffix = displaySong.isFavorite ? ' | Favorita' : '';
     const summarizedPath = summarizePath(displaySong.path);
-    const playerPrimaryMeta = displayArtist || `Archivo: ${displayFileName}`;
+    const albumSuffix = displaySong.album ? ` • ${displaySong.album}` : '';
+    const playerPrimaryMeta = `${displayArtist || displaySong.artist || 'Artista desconocido'}${albumSuffix}`;
+    const detailBits = [displaySong.sourceLabel, displaySong.durationText];
+
+    if (displaySong.genre) {
+      detailBits.push(`Genero: ${displaySong.genre}`);
+    }
+
+    detailBits.push(summarizedPath);
 
     elements.currentSongTitle.textContent = displaySong.title;
     elements.currentSongMeta.textContent = `${playerPrimaryMeta} | ${summarizedPath}${favoriteSuffix}`;
     elements.playerSongTitle.textContent = displaySong.title;
     elements.playerSongMeta.textContent =
-      `${playerPrimaryMeta} | ${displaySong.sourceLabel} | ${displaySong.durationText} | ${summarizedPath}${favoriteSuffix}`;
+      `${playerPrimaryMeta} | ${detailBits.join(' | ')}${favoriteSuffix}`;
 
     updateArtwork(elements.heroArtwork, elements.heroArtworkInitials, displaySong);
     updateArtwork(elements.playerArtwork, elements.playerArtworkInitials, displaySong);
+    waveformController.syncSong(displaySong);
     syncNowPlayingView();
   }
 
@@ -915,9 +956,12 @@ document.addEventListener('DOMContentLoaded', () => {
   ): void {
     const palette = song ? song.artwork : { start: '#2fbf8b', end: '#4b6cb7' };
     const initials = song ? song.initials : 'LP';
+    const artworkImage = song ? song.artworkDataUrl : null;
 
     artworkElement.style.setProperty('--art-start', palette.start);
     artworkElement.style.setProperty('--art-end', palette.end);
+    artworkElement.style.setProperty('--art-image', artworkImage ? `url("${artworkImage}")` : 'none');
+    artworkElement.classList.toggle('has-artwork-image', Boolean(artworkImage));
     initialsElement.textContent = initials;
   }
 
@@ -949,7 +993,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updatePlaybackProgress(): void {
-    playbackController.updateProgress();
+    const currentSong = getDisplaySong();
+    playbackController.updateProgress(currentSong ? currentSong.durationSeconds : null);
   }
 
   function readOneBasedPosition(inputElement: HTMLInputElement, maxValue: number): number | null {

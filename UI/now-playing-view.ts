@@ -107,11 +107,23 @@ class NowPlayingView {
     const displayArtist = window.SongLookupUtils.getDisplayArtist(displaySong);
     const displayFileName = window.SongLookupUtils.getDisplayFileName(displaySong) || displaySong.name;
     const favoriteSuffix = displaySong.isFavorite ? ' | Favorita' : '';
+    const primaryMeta = `${displayArtist || displaySong.artist || 'Artista desconocido'}${displaySong.album ? ` • ${displaySong.album}` : ''}`;
+    const contextBits = [displaySong.sourceLabel, displaySong.durationText, displayFileName];
+
+    if (displaySong.trackNumber) {
+      contextBits.push(`Pista ${displaySong.trackNumber}`);
+    }
+
+    if (displaySong.genre) {
+      contextBits.push(`Genero: ${displaySong.genre}`);
+    }
+
+    contextBits.push(this.summarizePath(displaySong.filePath || displaySong.path));
 
     this.elements.expandedSongTitle.textContent = displaySong.title;
-    this.elements.expandedSongMeta.textContent = `${displayArtist || `Archivo: ${displayFileName}`}${favoriteSuffix}`;
+    this.elements.expandedSongMeta.textContent = `${primaryMeta}${favoriteSuffix}`;
     this.elements.expandedSongContext.textContent =
-      `${displaySong.sourceLabel} | ${displaySong.durationText} | ${displayFileName} | ${this.summarizePath(displaySong.path)}`;
+      contextBits.join(' | ');
     this.elements.expandedModeSummary.textContent = modeSummary;
     this.updateArtwork(this.elements.expandedArtwork, this.elements.expandedArtworkInitials, displaySong);
 

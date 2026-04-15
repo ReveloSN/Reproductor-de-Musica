@@ -2,6 +2,7 @@ class SongLookupUtils {
   static genericArtistLabels = new Set([
     'archivo local',
     'local file',
+    'artista desconocido',
     'unknown artist',
     'desconocido',
     'sin artista',
@@ -38,7 +39,7 @@ class SongLookupUtils {
       return '';
     }
 
-    return this.stripNoise(this.stripExtension(song.name || song.title || ''));
+    return this.stripNoise(this.stripExtension(song.fileName || song.name || song.title || ''));
   }
 
   static getDisplayTitle(song: Track | null): string {
@@ -87,8 +88,9 @@ class SongLookupUtils {
       artist ? `${artist} ${fileName}` : '',
       title,
       fileName,
-      this.stripNoise(song.name),
+      this.stripNoise(song.fileName || song.name),
       this.stripNoise(song.title),
+      this.stripNoise(song.album || ''),
       artist || '',
     ]
       .map((candidate) => this.normalizeText(candidate))

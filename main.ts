@@ -1,6 +1,8 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain, type FileFilter } from 'electron';
 import path from 'node:path';
 import buildMenu from './menu';
+import { readAudioMetadata } from './audio-metadata-service';
+import { fetchLyricsFromRemote } from './lyrics-remote-service';
 
 const isDev = process.env.NODE_ENV === 'development';
 const AUDIO_FILE_FILTERS: FileFilter[] = [
@@ -41,6 +43,14 @@ ipcMain.handle('dialog:open-audio-files', async (): Promise<string[]> => {
   });
 
   return result.canceled ? [] : result.filePaths;
+});
+
+ipcMain.handle('audio:read-metadata', async (_event, filePath: string): Promise<AudioFileMetadata> => {
+  return readAudioMetadata(filePath);
+});
+
+ipcMain.handle('lyrics:lookup', async (_event, query: LyricsLookupQuery): Promise<LyricsResult> => {
+  return fetchLyricsFromRemote(query);
 });
 
 void app.whenReady().then(() => {

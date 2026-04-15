@@ -138,7 +138,7 @@
               <input
                 id="searchInput"
                 type="search"
-                placeholder="Buscar por titulo, archivo, ruta o extension"
+                placeholder="Buscar por titulo, artista, album, archivo o ruta"
                 autocomplete="off"
               />
             </label>
@@ -200,7 +200,7 @@
             <div class="table-header">
               <span>#</span>
               <span>Cancion</span>
-              <span>Origen</span>
+              <span>Detalles</span>
               <span>Duracion</span>
               <span></span>
             </div>
@@ -348,6 +348,17 @@
             </div>
 
             <div class="expanded-progress-card">
+              <div class="waveform-panel">
+                <div class="waveform-panel-header">
+                  <p class="eyebrow">Waveform</p>
+                  <p id="expandedWaveformStatus" class="waveform-status">
+                    Selecciona una cancion para ver su forma de onda.
+                  </p>
+                </div>
+
+                <div id="expandedWaveform" class="waveform-surface" data-state="idle"></div>
+              </div>
+
               <div class="progress-row progress-row-expanded">
                 <span id="expandedCurrentTimeLabel">0:00</span>
                 <input id="expandedProgressSlider" type="range" min="0" max="100" value="0" />
@@ -389,6 +400,8 @@
     <script src="lyrics-service.js"></script>
     <script src="translation-service.js"></script>
     <script src="renderer-dom.js"></script>
+    <script src="vendor/wavesurfer.min.js"></script>
+    <script src="waveform-controller.js"></script>
     <script src="playback-controller.js"></script>
     <script src="playlist-view.js"></script>
     <script src="now-playing-view.js"></script>

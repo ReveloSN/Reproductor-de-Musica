@@ -7,7 +7,7 @@ interface SongFactoryOptions {
 }
 
 interface ParsedSongLabel {
-  artist: string;
+  artist: string | null;
   title: string;
 }
 
@@ -33,12 +33,17 @@ class SongFactory {
     this.songIdCounter = 0;
   }
 
-  createSongsFromPaths(
+  async createSongsFromPaths(
     filePaths: string[],
     playlistManager: PlaylistManager
-  ): SongCollectionResult {
-    const songs = filePaths
-      .map((filePath) => this.buildSong(filePath))
+  ): Promise<SongCollectionResult> {
+    const builtSongs: Array<Track | null> = [];
+
+    for (const filePath of filePaths) {
+      builtSongs.push(await this.buildSong(filePath));
+    }
+
+    const songs = builtSongs
       .filter((song): song is Track => song !== null)
       .map((song) => playlistManager.getOrCreateSong(song));
 
@@ -48,7 +53,7 @@ class SongFactory {
     };
   }
 
-  buildSong(filePath: string): Track | null {
+  async buildSong(filePath: string): Promise<Track | null> {
     const extension = this.audioAPI.extname(filePath).toLowerCase();
 
     if (!this.supportedExtensions.has(extension)) {
@@ -57,41 +62,109 @@ class SongFactory {
 
     const fileName = this.audioAPI.basename(filePath);
     const parsedSong = this.parseSongLabel(fileName, extension);
-    const artwork = this.createArtworkPalette(`${parsedSong.title}-${filePath}`);
+    const metadata = await this.audioAPI.readAudioMetadata(filePath);
+    const title = this.resolveTitle(metadata.title, parsedSong.title, fileName);
+    const artist = this.resolveArtist(metadata.artist, parsedSong.artist);
+    const artwork = this.createArtworkPalette(`${artist}-${title}-${filePath}`);
+    const durationSeconds = metadata.durationSeconds;
 
     return {
       id: `song-${Date.now()}-${this.songIdCounter++}`,
       name: fileName,
-      title: parsedSong.title,
-      artist: parsedSong.artist,
+      fileName,
+      title,
+      artist,
+      album: this.sanitizeOptionalText(metadata.album),
       path: filePath,
+      filePath,
       url: this.audioAPI.filePathToUrl(filePath),
       extension: extension.replace('.', '').toUpperCase(),
-      durationSeconds: null,
-      durationText: '--:--',
+      durationSeconds,
+      durationText: durationSeconds ? this.formatDuration(durationSeconds) : '--:--',
       artwork,
-      initials: this.getInitials(parsedSong.title),
+      artworkDataUrl: metadata.artworkDataUrl,
+      artworkMimeType: metadata.artworkMimeType,
+      initials: this.getInitials(title || fileName),
+      genre: this.sanitizeOptionalText(metadata.genre),
+      trackNumber: metadata.trackNumber,
       sourceLabel: 'Archivo local',
       isFavorite: false,
     };
   }
 
   parseSongLabel(fileName: string, extension: string): ParsedSongLabel {
-    const nameWithoutExtension = fileName.slice(0, fileName.length - extension.length);
-    const cleaned = nameWithoutExtension.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const nameWithoutExtension = this.stripExtension(fileName, extension);
+    const cleaned = this.cleanFileLabel(nameWithoutExtension);
     const parts = cleaned.split(' - ').map((part) => part.trim()).filter(Boolean);
 
     if (parts.length >= 2) {
       return {
-        artist: parts[0],
+        artist: this.sanitizeOptionalText(parts[0]),
         title: parts.slice(1).join(' - '),
       };
     }
 
     return {
-      artist: 'Archivo local',
-      title: cleaned || fileName,
+      artist: null,
+      title: cleaned || this.stripExtension(fileName),
     };
+  }
+
+  cleanFileLabel(value: string): string {
+    return String(value || '')
+      .replace(/[_]+/g, ' ')
+      .replace(/^\s*\d{1,3}[\s\-_.]+/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  sanitizeOptionalText(value: string | null | undefined): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const cleaned = value.replace(/\s+/g, ' ').trim();
+    return cleaned || null;
+  }
+
+  stripExtension(fileName: string, extension = ''): string {
+    if (extension && fileName.toLowerCase().endsWith(extension.toLowerCase())) {
+      return fileName.slice(0, fileName.length - extension.length);
+    }
+
+    return fileName.replace(/\.[^.]+$/, '');
+  }
+
+  resolveTitle(metadataTitle: string | null, parsedTitle: string, fileName: string): string {
+    const preferredTitle = this.sanitizeOptionalText(metadataTitle);
+
+    if (preferredTitle) {
+      return preferredTitle;
+    }
+
+    const fallbackTitle = this.sanitizeOptionalText(parsedTitle);
+
+    if (fallbackTitle) {
+      return fallbackTitle;
+    }
+
+    return this.stripExtension(fileName) || fileName;
+  }
+
+  resolveArtist(metadataArtist: string | null, parsedArtist: string | null): string {
+    const preferredArtist = this.sanitizeOptionalText(metadataArtist);
+
+    if (preferredArtist) {
+      return preferredArtist;
+    }
+
+    const fallbackArtist = this.sanitizeOptionalText(parsedArtist);
+
+    if (fallbackArtist) {
+      return fallbackArtist;
+    }
+
+    return 'Artista desconocido';
   }
 
   createArtworkPalette(seed: string): ArtworkPalette {

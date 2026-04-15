@@ -64,6 +64,8 @@ interface RendererElements {
   expandedNextButton: HTMLButtonElement;
   expandedRepeatButton: HTMLButtonElement;
   expandedRepeatIndicator: HTMLSpanElement;
+  expandedWaveformStatus: HTMLParagraphElement;
+  expandedWaveform: HTMLDivElement;
   expandedProgressSlider: HTMLInputElement;
   expandedCurrentTimeLabel: HTMLSpanElement;
   expandedDurationLabel: HTMLSpanElement;

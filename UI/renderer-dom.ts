@@ -75,6 +75,8 @@ function createRendererElements(documentRef: Document): RendererElements {
     expandedNextButton: requireElement<HTMLButtonElement>(documentRef, 'expandedNextButton'),
     expandedRepeatButton: requireElement<HTMLButtonElement>(documentRef, 'expandedRepeatButton'),
     expandedRepeatIndicator: requireElement<HTMLSpanElement>(documentRef, 'expandedRepeatIndicator'),
+    expandedWaveformStatus: requireElement<HTMLParagraphElement>(documentRef, 'expandedWaveformStatus'),
+    expandedWaveform: requireElement<HTMLDivElement>(documentRef, 'expandedWaveform'),
     expandedProgressSlider: requireElement<HTMLInputElement>(documentRef, 'expandedProgressSlider'),
     expandedCurrentTimeLabel: requireElement<HTMLSpanElement>(documentRef, 'expandedCurrentTimeLabel'),
     expandedDurationLabel: requireElement<HTMLSpanElement>(documentRef, 'expandedDurationLabel'),

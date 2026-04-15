@@ -145,6 +145,28 @@ class PlaylistManager<TTrack extends Track = Track> {
     const existingSong = this.songLibraryByPath.get(songData.path);
 
     if (existingSong) {
+      existingSong.name = songData.name || existingSong.name;
+      existingSong.fileName = songData.fileName || existingSong.fileName;
+      existingSong.path = songData.path || existingSong.path;
+      existingSong.filePath = songData.filePath || existingSong.filePath;
+      existingSong.url = songData.url || existingSong.url;
+      existingSong.title = songData.title || existingSong.title;
+      existingSong.artist = songData.artist || existingSong.artist;
+      existingSong.album = songData.album || existingSong.album;
+      existingSong.sourceLabel = songData.sourceLabel || existingSong.sourceLabel;
+      existingSong.extension = songData.extension || existingSong.extension;
+      existingSong.initials = songData.initials || existingSong.initials;
+      existingSong.artwork = songData.artwork || existingSong.artwork;
+      existingSong.artworkDataUrl = songData.artworkDataUrl || existingSong.artworkDataUrl;
+      existingSong.artworkMimeType = songData.artworkMimeType || existingSong.artworkMimeType;
+      existingSong.genre = songData.genre || existingSong.genre;
+      existingSong.trackNumber = songData.trackNumber || existingSong.trackNumber;
+
+      if (Number.isFinite(songData.durationSeconds)) {
+        existingSong.durationSeconds = songData.durationSeconds;
+        existingSong.durationText = songData.durationText;
+      }
+
       return existingSong;
     }
 

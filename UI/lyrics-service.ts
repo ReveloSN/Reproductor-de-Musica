@@ -27,6 +27,22 @@ class LyricsService {
     return window.SongLookupUtils.buildLookupKeys(song);
   }
 
+  private buildRemoteQuery(song: Track): LyricsLookupQuery | null {
+    const title = window.SongLookupUtils.getDisplayTitle(song);
+    const artist = window.SongLookupUtils.getDisplayArtist(song);
+
+    if (!title || !artist) {
+      return null;
+    }
+
+    return {
+      title,
+      artist,
+      album: song.album,
+      durationSeconds: song.durationSeconds,
+    };
+  }
+
   async getLyrics(song: Track | null): Promise<LyricsResult> {
     if (!song) {
       return {
@@ -57,11 +73,39 @@ class LyricsService {
       }
     }
 
+    const remoteQuery = this.buildRemoteQuery(song);
+
+    if (!remoteQuery) {
+      return {
+        status: 'empty',
+        lyrics: '',
+        message: 'No se encontro informacion suficiente para buscar la letra.',
+        lookupKey: lookupKeys[0] || '',
+      };
+    }
+
+    if (!window.audioAPI) {
+      return {
+        status: 'error',
+        lyrics: '',
+        message: 'La integracion de Electron no esta disponible para consultar letras.',
+        lookupKey: lookupKeys[0] || '',
+      };
+    }
+
+    const remoteResult = await window.audioAPI.fetchLyrics(remoteQuery);
+
+    if (remoteResult.status === 'available' && remoteResult.lyrics) {
+      this.registerEntry(remoteResult.lookupKey || lookupKeys[0] || '', remoteResult.lyrics);
+
+      lookupKeys.forEach((lookupKey) => {
+        this.registerEntry(lookupKey, remoteResult.lyrics);
+      });
+    }
+
     return {
-      status: 'empty',
-      lyrics: '',
-      message: 'No se encontro letra para esta cancion',
-      lookupKey: lookupKeys[0] || '',
+      ...remoteResult,
+      lookupKey: remoteResult.lookupKey || lookupKeys[0] || '',
     };
   }
 }
