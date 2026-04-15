@@ -18,6 +18,11 @@ interface AudioFileMetadata {
   artworkMimeType: string | null;
 }
 
+interface AudioFolderSelection {
+  folderPath: string;
+  filePaths: string[];
+}
+
 interface Track {
   id: string;
   source: TrackSource;
@@ -73,6 +78,7 @@ interface LyricsResult {
   status: LookupStatus;
   lyrics: string;
   message: string;
+  syncedLyrics?: string | null;
   lookupKey?: string;
   provider?: string;
 }
@@ -123,7 +129,9 @@ interface YouTubeAPI {
 
 interface AudioAPI {
   openAudioFiles: () => Promise<string[]>;
+  openAudioFolder: () => Promise<AudioFolderSelection>;
   onMenuAudioFilesSelected: (callback: (filePaths: string[]) => void) => void;
+  onMenuAudioFolderSelected: (callback: (selection: AudioFolderSelection) => void) => void;
   filePathToUrl: (filePath: string) => string;
   basename: (filePath: string) => string;
   extname: (filePath: string) => string;

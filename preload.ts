@@ -26,9 +26,16 @@ contextBridge.exposeInMainWorld('versions', {
 
 contextBridge.exposeInMainWorld('audioAPI', {
   openAudioFiles: (): Promise<string[]> => ipcRenderer.invoke('dialog:open-audio-files') as Promise<string[]>,
+  openAudioFolder: (): Promise<AudioFolderSelection> =>
+    ipcRenderer.invoke('dialog:open-audio-folder') as Promise<AudioFolderSelection>,
   onMenuAudioFilesSelected: (callback: (filePaths: string[]) => void): void => {
     ipcRenderer.on('audio-files:selected', (_event, filePaths: string[]) => {
       callback(filePaths);
+    });
+  },
+  onMenuAudioFolderSelected: (callback: (selection: AudioFolderSelection) => void): void => {
+    ipcRenderer.on('audio-folder:selected', (_event, selection: AudioFolderSelection) => {
+      callback(selection);
     });
   },
   filePathToUrl: (filePath: string): string => {

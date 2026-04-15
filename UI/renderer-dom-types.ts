@@ -5,6 +5,7 @@ interface RendererElements {
   sidebarToggleButton: HTMLButtonElement;
   addEndButton: HTMLButtonElement;
   addStartButton: HTMLButtonElement;
+  addFolderButton: HTMLButtonElement;
   insertPosition: HTMLInputElement;
   insertAtPositionButton: HTMLButtonElement;
   feedbackMessage: HTMLParagraphElement;
@@ -17,7 +18,7 @@ interface RendererElements {
   modeSummaryChip: HTMLSpanElement;
   playlistSummary: HTMLSpanElement;
   playlistDurationLabel: HTMLSpanElement;
-  currentPositionLabel: HTMLSpanElement;
+  nodeVisualizer: HTMLDivElement;
   activePlaylistTitle: HTMLHeadingElement;
   activePlaylistDescription: HTMLParagraphElement;
   playlistPanelTitle: HTMLHeadingElement;
@@ -40,6 +41,7 @@ interface RendererElements {
   youtubePlayerMeta: HTMLParagraphElement;
   youtubeOpenFallbackButton: HTMLButtonElement;
   playlist: HTMLUListElement;
+  playlistEmptyState: HTMLDivElement;
   heroArtwork: HTMLDivElement;
   heroArtworkInitials: HTMLSpanElement;
   playerTrackTrigger: HTMLDivElement;
@@ -59,6 +61,7 @@ interface RendererElements {
   progressSlider: HTMLInputElement;
   currentTimeLabel: HTMLSpanElement;
   durationLabel: HTMLSpanElement;
+  muteButton: HTMLButtonElement;
   volumeSlider: HTMLInputElement;
   nowPlayingOverlay: HTMLElement;
   closeNowPlayingButton: HTMLButtonElement;

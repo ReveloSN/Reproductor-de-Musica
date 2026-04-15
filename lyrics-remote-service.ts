@@ -58,6 +58,15 @@ function extractLyrics(record: LrclibLyricsRecord | null): string {
   return stripSyncedTimestamps(syncedLyrics);
 }
 
+function extractSyncedLyrics(record: LrclibLyricsRecord | null): string | null {
+  if (!record) {
+    return null;
+  }
+
+  const syncedLyrics = String(record.syncedLyrics || '').trim();
+  return syncedLyrics || null;
+}
+
 function isValidQuery(query: LyricsLookupQuery): boolean {
   return Boolean(normalizeLookupValue(query.title) && normalizeLookupValue(query.artist));
 }
@@ -189,12 +198,14 @@ export async function fetchLyricsFromRemote(query: LyricsLookupQuery): Promise<L
     const directMatch = await fetchDirectMatch(query);
     const resolvedRecord = directMatch || (await fetchSearchMatch(query));
     const lyrics = extractLyrics(resolvedRecord);
+    const syncedLyrics = extractSyncedLyrics(resolvedRecord);
 
     if (!lyrics) {
       return {
         status: 'empty',
         lyrics: '',
         message: 'No se encontro letra para esta cancion',
+        syncedLyrics: null,
         lookupKey: buildLookupKey(query),
         provider: LRCLIB_PROVIDER,
       };
@@ -204,6 +215,7 @@ export async function fetchLyricsFromRemote(query: LyricsLookupQuery): Promise<L
       status: 'available',
       lyrics,
       message: '',
+      syncedLyrics,
       lookupKey: buildLookupKey(query),
       provider: LRCLIB_PROVIDER,
     };
@@ -214,6 +226,7 @@ export async function fetchLyricsFromRemote(query: LyricsLookupQuery): Promise<L
       status: 'error',
       lyrics: '',
       message: `No fue posible consultar ${LRCLIB_PROVIDER}: ${message}`,
+      syncedLyrics: null,
       lookupKey: buildLookupKey(query),
       provider: LRCLIB_PROVIDER,
     };

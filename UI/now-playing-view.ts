@@ -1,28 +1,42 @@
 type LyricsPanelUiState = LookupStatus | 'loading';
 
+interface ParsedLyricLine {
+  timeSeconds: number;
+  text: string;
+  element: HTMLDivElement | null;
+}
+
 interface NowPlayingViewOptions {
   lyricsService: LyricsService;
-  translationService: TranslationService;
   summarizePath: (filePath: string) => string;
-  updateArtwork: (artworkElement: HTMLDivElement, initialsElement: HTMLSpanElement, song: Track | null) => void;
+  updateArtwork: (
+    artworkElement: HTMLDivElement,
+    initialsElement: HTMLSpanElement,
+    song: Track | null
+  ) => void;
 }
 
 class NowPlayingView {
   elements: RendererElements;
   lyricsService: LyricsService;
-  translationService: TranslationService;
   summarizePath: (filePath: string) => string;
-  updateArtwork: (artworkElement: HTMLDivElement, initialsElement: HTMLSpanElement, song: Track | null) => void;
+  updateArtwork: (
+    artworkElement: HTMLDivElement,
+    initialsElement: HTMLSpanElement,
+    song: Track | null
+  ) => void;
   isNowPlayingOpen: boolean;
   currentLyricsSongId: string;
   lyricsLoadToken: number;
-  lyricsCache: Map<string, { original: LyricsResult; translation: TranslationResult }>;
+  lyricsCache: Map<string, LyricsResult>;
   lastFocusedElement: HTMLElement | null;
+  syncedLyricLines: ParsedLyricLine[];
+  activeLyricLineIndex: number;
+  lastPlaybackTimeSeconds: number | null;
 
   constructor(elements: RendererElements, options: NowPlayingViewOptions) {
     this.elements = elements;
     this.lyricsService = options.lyricsService;
-    this.translationService = options.translationService;
     this.summarizePath = options.summarizePath;
     this.updateArtwork = options.updateArtwork;
     this.isNowPlayingOpen = false;
@@ -30,6 +44,9 @@ class NowPlayingView {
     this.lyricsLoadToken = 0;
     this.lyricsCache = new Map();
     this.lastFocusedElement = null;
+    this.syncedLyricLines = [];
+    this.activeLyricLineIndex = -1;
+    this.lastPlaybackTimeSeconds = null;
   }
 
   bindEvents(onOpenRequest: () => void): void {
@@ -88,26 +105,23 @@ class NowPlayingView {
       this.elements.expandedSongTitle.textContent = 'Sin cancion activa';
       this.elements.expandedSongMeta.textContent = 'Selecciona una cancion para abrir esta vista.';
       this.elements.expandedSongContext.textContent =
-        'La letra y su traduccion apareceran aqui cuando esten disponibles.';
+        'La letra aparecera aqui cuando este disponible.';
       this.elements.expandedModeSummary.textContent = modeSummary;
       this.updateArtwork(this.elements.expandedArtwork, this.elements.expandedArtworkInitials, null);
-      this.renderLyricsResult('original', {
+      this.renderLyricsResult({
         status: 'empty',
         lyrics: '',
+        syncedLyrics: null,
         message: 'No se encontro letra para esta cancion',
-      });
-      this.renderLyricsResult('translated', {
-        status: 'empty',
-        translation: '',
-        message: 'No hay traduccion disponible para esta cancion',
       });
       return;
     }
 
     const displayArtist = window.SongLookupUtils.getDisplayArtist(displaySong);
-    const displayFileName = window.SongLookupUtils.getDisplayFileName(displaySong) || displaySong.name;
+    const displayFileName =
+      window.SongLookupUtils.getDisplayFileName(displaySong) || displaySong.name;
     const favoriteSuffix = displaySong.isFavorite ? ' | Favorita' : '';
-    const primaryMeta = `${displayArtist || displaySong.artist || 'Artista desconocido'}${displaySong.album ? ` • ${displaySong.album}` : ''}`;
+    const primaryMeta = `${displayArtist || displaySong.artist || 'Artista desconocido'}${displaySong.album ? ` | ${displaySong.album}` : ''}`;
     const contextBits = [displaySong.sourceLabel, displaySong.durationText, displayFileName];
 
     if (displaySong.trackNumber) {
@@ -122,8 +136,7 @@ class NowPlayingView {
 
     this.elements.expandedSongTitle.textContent = displaySong.title;
     this.elements.expandedSongMeta.textContent = `${primaryMeta}${favoriteSuffix}`;
-    this.elements.expandedSongContext.textContent =
-      contextBits.join(' | ');
+    this.elements.expandedSongContext.textContent = contextBits.join(' | ');
     this.elements.expandedModeSummary.textContent = modeSummary;
     this.updateArtwork(this.elements.expandedArtwork, this.elements.expandedArtworkInitials, displaySong);
 
@@ -137,23 +150,38 @@ class NowPlayingView {
     const cached = this.lyricsCache.get(displaySong.id);
 
     if (cached) {
-      this.renderLyricsResult('original', cached.original);
-      this.renderLyricsResult('translated', cached.translation);
+      this.renderLyricsResult(cached);
     }
+  }
+
+  syncPlaybackPosition(currentTimeSeconds: number | null): void {
+    this.lastPlaybackTimeSeconds =
+      typeof currentTimeSeconds === 'number' && Number.isFinite(currentTimeSeconds)
+        ? Math.max(currentTimeSeconds, 0)
+        : null;
+
+    if (this.syncedLyricLines.length === 0) {
+      return;
+    }
+
+    const nextActiveIndex = this.getActiveLyricLineIndex(this.lastPlaybackTimeSeconds);
+
+    if (nextActiveIndex === this.activeLyricLineIndex) {
+      return;
+    }
+
+    this.activeLyricLineIndex = nextActiveIndex;
+    this.updateSyncedLyricClasses();
   }
 
   private async loadLyricsForSong(song: Track | null): Promise<void> {
     if (!song) {
       this.currentLyricsSongId = '';
-      this.renderLyricsResult('original', {
+      this.renderLyricsResult({
         status: 'empty',
         lyrics: '',
+        syncedLyrics: null,
         message: 'No se encontro letra para esta cancion',
-      });
-      this.renderLyricsResult('translated', {
-        status: 'empty',
-        translation: '',
-        message: 'No hay traduccion disponible para esta cancion',
       });
       return;
     }
@@ -164,8 +192,7 @@ class NowPlayingView {
       const cached = this.lyricsCache.get(song.id);
 
       if (cached) {
-        this.renderLyricsResult('original', cached.original);
-        this.renderLyricsResult('translated', cached.translation);
+        this.renderLyricsResult(cached);
       }
 
       return;
@@ -181,15 +208,8 @@ class NowPlayingView {
         return;
       }
 
-      const translation = await this.translationService.getTranslation(song, original);
-
-      if (token !== this.lyricsLoadToken) {
-        return;
-      }
-
-      this.lyricsCache.set(song.id, { original, translation });
-      this.renderLyricsResult('original', original);
-      this.renderLyricsResult('translated', translation);
+      this.lyricsCache.set(song.id, original);
+      this.renderLyricsResult(original);
     } catch (error) {
       if (token !== this.lyricsLoadToken) {
         return;
@@ -197,61 +217,172 @@ class NowPlayingView {
 
       const message = error instanceof Error ? error.message : String(error);
 
-      this.renderLyricsResult('original', {
+      this.renderLyricsResult({
         status: 'error',
         lyrics: '',
+        syncedLyrics: null,
         message: `No fue posible cargar la letra: ${message}`,
-      });
-      this.renderLyricsResult('translated', {
-        status: 'error',
-        translation: '',
-        message: `No fue posible cargar la traduccion: ${message}`,
       });
     }
   }
 
   private renderLyricsLoadingState(): void {
-    this.setLyricsPanelState('original', 'loading', 'Buscando letra...', '');
-    this.setLyricsPanelState('translated', 'loading', 'Preparando traduccion...', '');
+    this.resetSyncedLyrics();
+    this.setLyricsPanelState('loading', 'Buscando letra...', '');
   }
 
-  private renderLyricsResult(
-    kind: LyricsPanelKind,
-    result: LyricsResult | TranslationResult
-  ): void {
-    const text = kind === 'original'
-      ? (result as LyricsResult).lyrics
-      : (result as TranslationResult).translation;
-
+  private renderLyricsResult(result: LyricsResult): void {
     if (result.status === 'available') {
-      this.setLyricsPanelState(kind, 'available', 'Disponible', text);
+      const parsedSyncedLyrics = this.parseSyncedLyrics(result.syncedLyrics);
+
+      if (parsedSyncedLyrics.length > 0) {
+        this.setLyricsStatus('Sincronizada', 'available');
+        this.renderSyncedLyrics(parsedSyncedLyrics);
+        this.syncPlaybackPosition(this.lastPlaybackTimeSeconds);
+        return;
+      }
+
+      this.resetSyncedLyrics();
+      this.setLyricsPanelState('available', 'Disponible', result.lyrics);
       return;
     }
+
+    this.resetSyncedLyrics();
 
     if (result.status === 'error') {
-      this.setLyricsPanelState(kind, 'error', 'Error', result.message);
+      this.setLyricsPanelState('error', 'Error', result.message);
       return;
     }
 
-    this.setLyricsPanelState(kind, 'empty', 'Sin datos', result.message);
+    this.setLyricsPanelState('empty', 'Sin datos', result.message);
   }
 
   private setLyricsPanelState(
-    kind: LyricsPanelKind,
     state: LyricsPanelUiState,
     statusText: string,
     contentText: string
   ): void {
-    const statusElement =
-      kind === 'original' ? this.elements.lyricsOriginalStatus : this.elements.lyricsTranslatedStatus;
-    const contentElement =
-      kind === 'original' ? this.elements.lyricsOriginalContent : this.elements.lyricsTranslatedContent;
+    this.setLyricsStatus(statusText, state);
+    this.elements.lyricsOriginalContent.textContent = contentText;
+    this.elements.lyricsOriginalContent.dataset.state = state;
+    this.elements.lyricsOriginalContent.classList.toggle('is-empty', state !== 'available');
+    this.elements.lyricsOriginalContent.classList.remove('is-synced');
+  }
 
-    statusElement.textContent = statusText;
-    statusElement.dataset.state = state;
-    contentElement.textContent = contentText;
-    contentElement.dataset.state = state;
-    contentElement.classList.toggle('is-empty', state !== 'available');
+  private setLyricsStatus(statusText: string, state: LyricsPanelUiState): void {
+    this.elements.lyricsOriginalStatus.textContent = statusText;
+    this.elements.lyricsOriginalStatus.dataset.state = state;
+  }
+
+  private renderSyncedLyrics(lines: ParsedLyricLine[]): void {
+    const fragment = document.createDocumentFragment();
+
+    this.resetSyncedLyrics();
+    this.elements.lyricsOriginalContent.replaceChildren();
+    this.elements.lyricsOriginalContent.dataset.state = 'available';
+    this.elements.lyricsOriginalContent.classList.remove('is-empty');
+    this.elements.lyricsOriginalContent.classList.add('is-synced');
+
+    this.syncedLyricLines = lines.map((line) => {
+      const element = document.createElement('div');
+      element.className = 'lyrics-line';
+      element.textContent = line.text;
+      fragment.appendChild(element);
+
+      return {
+        ...line,
+        element,
+      };
+    });
+
+    this.elements.lyricsOriginalContent.appendChild(fragment);
+  }
+
+  private parseSyncedLyrics(value: string | null | undefined): ParsedLyricLine[] {
+    const rawLyrics = String(value || '').trim();
+
+    if (!rawLyrics) {
+      return [];
+    }
+
+    const parsedLines: ParsedLyricLine[] = [];
+
+    rawLyrics.split(/\r?\n/).forEach((rawLine) => {
+      const matches = [...rawLine.matchAll(/\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/g)];
+      const text = rawLine.replace(/\[[^\]]+\]/g, '').trim();
+
+      if (!text || matches.length === 0) {
+        return;
+      }
+
+      matches.forEach((match) => {
+        const minutes = Number(match[1] || '0');
+        const seconds = Number(match[2] || '0');
+        const fractionRaw = match[3] || '';
+        const fraction =
+          fractionRaw.length === 0
+            ? 0
+            : Number(`0.${fractionRaw.padEnd(3, '0').slice(0, 3)}`);
+
+        parsedLines.push({
+          timeSeconds: minutes * 60 + seconds + fraction,
+          text,
+          element: null,
+        });
+      });
+    });
+
+    return parsedLines.sort((left, right) => left.timeSeconds - right.timeSeconds);
+  }
+
+  private getActiveLyricLineIndex(currentTimeSeconds: number | null): number {
+    if (currentTimeSeconds === null || this.syncedLyricLines.length === 0) {
+      return -1;
+    }
+
+    let activeIndex = -1;
+
+    this.syncedLyricLines.forEach((line, index) => {
+      if (line.timeSeconds <= currentTimeSeconds + 0.12) {
+        activeIndex = index;
+      }
+    });
+
+    return activeIndex;
+  }
+
+  private updateSyncedLyricClasses(): void {
+    this.syncedLyricLines.forEach((line, index) => {
+      if (!line.element) {
+        return;
+      }
+
+      line.element.classList.toggle('is-active', index === this.activeLyricLineIndex);
+      line.element.classList.toggle(
+        'is-past',
+        this.activeLyricLineIndex !== -1 && index < this.activeLyricLineIndex
+      );
+    });
+
+    if (!this.isNowPlayingOpen || this.activeLyricLineIndex === -1) {
+      return;
+    }
+
+    const activeLine = this.syncedLyricLines[this.activeLyricLineIndex];
+
+    if (!activeLine?.element) {
+      return;
+    }
+
+    activeLine.element.scrollIntoView({
+      block: 'center',
+      behavior: 'smooth',
+    });
+  }
+
+  private resetSyncedLyrics(): void {
+    this.syncedLyricLines = [];
+    this.activeLyricLineIndex = -1;
   }
 }
 

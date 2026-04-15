@@ -1,7 +1,7 @@
 const DEFAULT_LYRICS_LIBRARY: Record<string, string> = {};
 
 class LyricsService {
-  lyricsLibrary: Map<string, string>;
+  lyricsLibrary: Map<string, LyricsResult>;
 
   constructor() {
     this.lyricsLibrary = new Map();
@@ -19,8 +19,27 @@ class LyricsService {
     const sanitizedLyrics = String(lyrics || '').trim();
 
     if (normalizedLookupKey && sanitizedLyrics) {
-      this.lyricsLibrary.set(normalizedLookupKey, sanitizedLyrics);
+      this.lyricsLibrary.set(normalizedLookupKey, {
+        status: 'available',
+        lyrics: sanitizedLyrics,
+        message: '',
+        syncedLyrics: null,
+        lookupKey: normalizedLookupKey,
+      });
     }
+  }
+
+  registerResult(lookupKey: string, result: LyricsResult): void {
+    const normalizedLookupKey = window.SongLookupUtils.normalizeText(lookupKey);
+
+    if (!normalizedLookupKey || result.status !== 'available' || !result.lyrics) {
+      return;
+    }
+
+    this.lyricsLibrary.set(normalizedLookupKey, {
+      ...result,
+      lookupKey: normalizedLookupKey,
+    });
   }
 
   buildLookupKeys(song: Track | null): string[] {
@@ -63,11 +82,11 @@ class LyricsService {
     }
 
     for (const lookupKey of lookupKeys) {
-      if (this.lyricsLibrary.has(lookupKey)) {
+      const cachedResult = this.lyricsLibrary.get(lookupKey);
+
+      if (cachedResult) {
         return {
-          status: 'available',
-          lyrics: this.lyricsLibrary.get(lookupKey) || '',
-          message: '',
+          ...cachedResult,
           lookupKey,
         };
       }
@@ -96,10 +115,10 @@ class LyricsService {
     const remoteResult = await window.audioAPI.fetchLyrics(remoteQuery);
 
     if (remoteResult.status === 'available' && remoteResult.lyrics) {
-      this.registerEntry(remoteResult.lookupKey || lookupKeys[0] || '', remoteResult.lyrics);
+      this.registerResult(remoteResult.lookupKey || lookupKeys[0] || '', remoteResult);
 
       lookupKeys.forEach((lookupKey) => {
-        this.registerEntry(lookupKey, remoteResult.lyrics);
+        this.registerResult(lookupKey, remoteResult);
       });
     }
 

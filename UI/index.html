@@ -16,51 +16,46 @@
         <div class="brand-block">
           <div class="brand-mark">LP</div>
           <div>
-            <p class="eyebrow">Electron local</p>
+            <p class="eyebrow">Tu musica</p>
             <h1>Local Audio Player</h1>
           </div>
         </div>
 
-        <p class="sidebar-lead">
-          Reproductor local con playlist doblemente enlazada, controles modernos y
-          barra fija persistente.
-        </p>
-
         <nav class="nav-list" aria-label="Secciones">
-          <div class="nav-item">
+          <button class="nav-item" type="button" data-scroll-target="playlistSection">
             <span class="nav-icon">01</span>
             <div>
-              <strong>Biblioteca local</strong>
-              <span>Archivos desde tu dispositivo</span>
+              <strong>Biblioteca</strong>
             </div>
-          </div>
-          <div class="nav-item is-active">
+          </button>
+          <button class="nav-item is-active" type="button" data-scroll-target="heroSection">
             <span class="nav-icon">02</span>
             <div>
-              <strong>Playlist principal</strong>
-              <span>Lista doble activa</span>
+              <strong>Playlist activa</strong>
             </div>
-          </div>
-          <div class="nav-item">
+          </button>
+          <button class="nav-item" type="button" data-scroll-target="youtubeSection">
             <span class="nav-icon">03</span>
             <div>
               <strong>YouTube</strong>
-              <span>Busqueda oficial y playback embebido</span>
             </div>
-          </div>
+          </button>
         </nav>
 
         <section class="sidebar-card">
           <div class="section-heading">
             <p class="eyebrow">Carga</p>
             <h2>Gestion de playlist</h2>
-            <p>Agrega canciones al inicio, final o en una posicion exacta.</p>
+            <p>Organiza tu cola local como quieras.</p>
           </div>
 
           <div class="action-stack">
             <button id="addEndButton" class="button button-primary">Agregar al final</button>
             <button id="addStartButton" class="button button-secondary">
               Agregar al inicio
+            </button>
+            <button id="addFolderButton" class="button button-secondary">
+              Cargar carpeta como playlist
             </button>
           </div>
 
@@ -82,7 +77,7 @@
           </div>
 
           <p id="feedbackMessage" class="feedback" role="status" aria-live="polite">
-            Carga canciones locales en MP3, WAV, OGG o M4A.
+            Todo listo para cargar tu musica.
           </p>
         </section>
 
@@ -90,10 +85,7 @@
           <div class="section-heading">
             <p class="eyebrow">Playlists</p>
             <h2>Tus playlists</h2>
-            <p>
-              Crea playlists nuevas, cambia rapido entre listas y encuentra
-              "Mis favoritos" siempre disponible.
-            </p>
+            <p>Crea listas nuevas y cambia rapido entre ellas.</p>
           </div>
 
           <div class="playlist-create-row">
@@ -115,7 +107,7 @@
           </div>
 
           <p id="playlistHelperText" class="playlist-helper">
-            "Mis favoritos" se llena automaticamente con tus canciones marcadas.
+            "Mis favoritos" se actualiza automaticamente.
           </p>
 
           <div id="playlistList" class="playlist-collection-list" aria-label="Tus playlists"></div>
@@ -161,7 +153,7 @@
         </header>
 
         <main class="content">
-          <section class="hero-card">
+          <section id="heroSection" class="hero-card">
             <div id="heroArtwork" class="artwork artwork-hero">
               <span id="heroArtworkInitials">LP</span>
             </div>
@@ -170,23 +162,27 @@
               <p class="eyebrow">Playlist</p>
               <h3 id="activePlaylistTitle">Playlist principal</h3>
               <p id="activePlaylistDescription" class="hero-description">
-                Tu lista base para cargar, ordenar y reproducir archivos locales.
+                Tu seleccion activa.
               </p>
 
               <div class="hero-meta">
                 <span id="playlistSummary">0 canciones</span>
                 <span id="playlistDurationLabel">Duracion conocida: 0:00</span>
-                <span id="currentPositionLabel">Nodo actual: sin seleccion</span>
+                <div
+                  id="nodeVisualizer"
+                  class="node-visualizer"
+                  aria-label="Visualizador de nodos"
+                ></div>
               </div>
             </div>
           </section>
 
-          <section class="now-playing-card">
+          <section id="nowPlayingSection" class="now-playing-card">
             <div>
               <p class="eyebrow">Ahora sonando</p>
               <h3 id="currentSongTitle">Sin canciones cargadas</h3>
               <p id="currentSongMeta" class="now-playing-meta">
-                Usa la barra lateral o el menu Archivo para cargar archivos locales.
+                Aun no hay reproduccion activa.
               </p>
             </div>
 
@@ -197,7 +193,7 @@
             </div>
           </section>
 
-          <section class="youtube-panel">
+          <section id="youtubeSection" class="youtube-panel">
             <div class="youtube-panel-header">
               <div>
                 <p class="eyebrow">YouTube</p>
@@ -265,7 +261,7 @@
             </div>
           </section>
 
-          <section class="playlist-panel">
+          <section id="playlistSection" class="playlist-panel">
             <div class="playlist-panel-header">
               <div>
                 <h3 id="playlistPanelTitle">Playlist principal</h3>
@@ -284,6 +280,13 @@
             </div>
 
             <ul id="playlist" class="playlist" aria-label="Playlist local"></ul>
+            <div id="playlistEmptyState" class="playlist-empty-state" hidden>
+            <div class="playlist-empty-icon">♪</div>
+              <h4>Tu playlist esta vacia</h4>
+              <p>
+                Agrega canciones para empezar a reproducir.
+              </p>
+            </div>
           </section>
         </main>
       </div>
@@ -309,19 +312,49 @@
 
       <div class="player-center">
         <div class="transport-controls">
-          <button id="shuffleButton" class="transport-icon-button" type="button" title="Aleatorio">
+          <button
+            id="shuffleButton"
+            class="transport-icon-button"
+            type="button"
+            title="Aleatorio (S)"
+            aria-label="Activar modo aleatorio"
+          >
             <span class="transport-glyph">&#8644;</span>
           </button>
-          <button id="previousButton" class="transport-icon-button" type="button" title="Anterior">
+          <button
+            id="previousButton"
+            class="transport-icon-button"
+            type="button"
+            title="Anterior (←)"
+            aria-label="Canción anterior"
+          >
             <span class="transport-glyph">&#9198;</span>
           </button>
-          <button id="playButton" class="transport-main-button" type="button" title="Play / Pause">
+          <button
+            id="playButton"
+            class="transport-main-button"
+            type="button"
+            title="Play / Pause (Espacio)"
+            aria-label="Reproducir o pausar"
+          >
             <span id="playPauseGlyph" class="transport-glyph">&#9654;</span>
           </button>
-          <button id="nextButton" class="transport-icon-button" type="button" title="Siguiente">
+          <button
+            id="nextButton"
+            class="transport-icon-button"
+            type="button"
+            title="Siguiente (→)"
+            aria-label="Siguiente canción"
+          >
             <span class="transport-glyph">&#9197;</span>
           </button>
-          <button id="repeatButton" class="transport-icon-button" type="button" title="Repetir">
+          <button
+            id="repeatButton"
+            class="transport-icon-button"
+            type="button"
+            title="Repetir"
+            aria-label="Cambiar modo de repetición"
+          >
             <span class="transport-glyph">&#8634;</span>
             <span id="repeatIndicator" class="transport-badge">off</span>
           </button>
@@ -335,13 +368,50 @@
       </div>
 
       <div class="player-side">
-        <button id="stopButton" class="transport-secondary-button" type="button" title="Detener">
+        <button
+          id="stopButton"
+          class="transport-secondary-button"
+          type="button"
+          title="Detener"
+          aria-label="Detener reproducción"
+        >
           &#9632;
         </button>
 
         <div class="volume-group">
-          <span class="volume-label">Vol</span>
-          <input id="volumeSlider" type="range" min="0" max="100" value="70" />
+          <button
+            id="muteButton"
+            class="volume-icon-button"
+            type="button"
+            title="Silenciar / Activar (M)"
+            aria-label="Silenciar o activar audio"
+          >
+            <svg
+              id="volumeIcon"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                id="volumeIconPath"
+                d="M2 5.5h2.5L8 2v12L4.5 10.5H2V5.5z M10 4.5c1.2 1 2 2.5 2 3.5s-.8 2.5-2 3.5"
+                stroke="currentColor"
+                stroke-width="1.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <input
+            id="volumeSlider"
+            type="range"
+            min="0"
+            max="100"
+            value="70"
+            aria-label="Volumen"
+          />
         </div>
       </div>
 
@@ -372,7 +442,7 @@
                 Selecciona una cancion para abrir esta vista.
               </p>
               <p id="expandedSongContext" class="expanded-song-context">
-                La letra y su traduccion apareceran aqui cuando esten disponibles.
+                La letra aparecera aqui cuando este disponible.
               </p>
             </div>
 
@@ -448,7 +518,7 @@
           <div class="lyrics-columns">
             <section class="lyrics-card">
               <div class="lyrics-card-header">
-                <p class="eyebrow">Letra original</p>
+                <p class="eyebrow">Letra</p>
                 <h3>Original</h3>
                 <p id="lyricsOriginalStatus" class="lyrics-status">
                   No se encontro letra para esta cancion.
@@ -457,7 +527,7 @@
               <div id="lyricsOriginalContent" class="lyrics-content"></div>
             </section>
 
-            <section class="lyrics-card">
+            <section class="lyrics-card" hidden>
               <div class="lyrics-card-header">
                 <p class="eyebrow">Traduccion</p>
                 <h3>Version traducida</h3>

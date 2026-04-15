@@ -1,4 +1,15 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain, session, shell, type FileFilter } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  dialog,
+  ipcMain,
+  session,
+  shell,
+  type FileFilter,
+  type OpenDialogOptions,
+} from 'electron';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import buildMenu from './menu';
 import { readAudioMetadata } from './audio-metadata-service';
@@ -10,6 +21,7 @@ const isDev = process.env.NODE_ENV === 'development';
 const AUDIO_FILE_FILTERS: FileFilter[] = [
   { name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'm4a'] },
 ];
+const AUDIO_EXTENSIONS = new Set<string>(['.mp3', '.wav', '.ogg', '.m4a']);
 const YOUTUBE_REQUEST_URLS = [
   'https://www.youtube.com/*',
   'https://*.youtube.com/*',
@@ -86,6 +98,74 @@ function configureYouTubeEmbedIdentity(embedBaseUrl: string): void {
   );
 }
 
+async function collectAudioFilesFromDirectory(directoryPath: string): Promise<string[]> {
+  const audioFiles: string[] = [];
+
+  async function walk(currentPath: string): Promise<void> {
+    const entries = await fs.readdir(currentPath, { withFileTypes: true });
+    const sortedEntries = [...entries].sort((left, right) =>
+      left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+
+    for (const entry of sortedEntries) {
+      const entryPath = path.join(currentPath, entry.name);
+
+      if (entry.isDirectory()) {
+        await walk(entryPath);
+        continue;
+      }
+
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      const extension = path.extname(entry.name).toLowerCase();
+
+      if (AUDIO_EXTENSIONS.has(extension)) {
+        audioFiles.push(entryPath);
+      }
+    }
+  }
+
+  await walk(directoryPath);
+  return audioFiles;
+}
+
+async function openAudioFolderDialog(
+  browserWindow?: BrowserWindow
+): Promise<AudioFolderSelection> {
+  const dialogOptions: OpenDialogOptions = {
+    properties: ['openDirectory'],
+    buttonLabel: 'Abrir carpeta',
+  };
+  const result = browserWindow
+    ? await dialog.showOpenDialog(browserWindow, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return {
+      folderPath: '',
+      filePaths: [],
+    };
+  }
+
+  const folderPath = result.filePaths[0] || '';
+
+  if (!folderPath) {
+    return {
+      folderPath: '',
+      filePaths: [],
+    };
+  }
+
+  const filePaths = await collectAudioFilesFromDirectory(folderPath);
+
+  return {
+    folderPath,
+    filePaths,
+  };
+}
+
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     title: 'Local Audio Player',
@@ -111,7 +191,15 @@ function createWindow(): BrowserWindow {
 
   void mainWindow.loadURL(`${localAppBaseUrl}/index.html`);
 
-  const mainMenu = Menu.buildFromTemplate(buildMenu(mainWindow, AUDIO_FILE_FILTERS));
+  const mainMenu = Menu.buildFromTemplate(
+    buildMenu(mainWindow, AUDIO_FILE_FILTERS, async () => {
+      const selection = await openAudioFolderDialog(mainWindow);
+
+      if (selection.folderPath) {
+        mainWindow.webContents.send('audio-folder:selected', selection);
+      }
+    })
+  );
   Menu.setApplicationMenu(mainMenu);
 
   return mainWindow;
@@ -124,6 +212,10 @@ ipcMain.handle('dialog:open-audio-files', async (): Promise<string[]> => {
   });
 
   return result.canceled ? [] : result.filePaths;
+});
+
+ipcMain.handle('dialog:open-audio-folder', async (): Promise<AudioFolderSelection> => {
+  return openAudioFolderDialog();
 });
 
 ipcMain.handle('audio:read-metadata', async (_event, filePath: string): Promise<AudioFileMetadata> => {
