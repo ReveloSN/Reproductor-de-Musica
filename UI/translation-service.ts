@@ -1,32 +1,30 @@
+const DEFAULT_TRANSLATION_LIBRARY: Record<string, string> = {};
+
 class TranslationService {
   translationLibrary: Map<string, string>;
 
   constructor() {
     this.translationLibrary = new Map();
+    this.registerEntries(DEFAULT_TRANSLATION_LIBRARY);
   }
 
-  normalizeText(value: string): string {
-    return String(value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
-      .replace(/\s+/g, ' ');
+  registerEntries(entries: Record<string, string>): void {
+    Object.entries(entries).forEach(([lookupKey, translation]) => {
+      this.registerEntry(lookupKey, translation);
+    });
+  }
+
+  registerEntry(lookupKey: string, translation: string): void {
+    const normalizedLookupKey = window.SongLookupUtils.normalizeText(lookupKey);
+    const sanitizedTranslation = String(translation || '').trim();
+
+    if (normalizedLookupKey && sanitizedTranslation) {
+      this.translationLibrary.set(normalizedLookupKey, sanitizedTranslation);
+    }
   }
 
   buildLookupKeys(song: Track | null): string[] {
-    if (!song) {
-      return [];
-    }
-
-    const keys = [
-      this.normalizeText(`${song.artist} ${song.title}`),
-      this.normalizeText(song.title),
-      this.normalizeText(song.name),
-    ].filter(Boolean);
-
-    return Array.from(new Set(keys));
+    return window.SongLookupUtils.buildLookupKeys(song);
   }
 
   async getTranslation(song: Track | null, lyricsResult: LyricsResult): Promise<TranslationResult> {
@@ -47,6 +45,14 @@ class TranslationService {
     }
 
     const lookupKeys = this.buildLookupKeys(song);
+
+    if (lookupKeys.length === 0) {
+      return {
+        status: 'empty',
+        translation: '',
+        message: 'No hay datos suficientes para buscar una traduccion.',
+      };
+    }
 
     for (const lookupKey of lookupKeys) {
       if (this.translationLibrary.has(lookupKey)) {

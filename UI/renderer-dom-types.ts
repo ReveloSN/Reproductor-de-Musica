@@ -2,6 +2,7 @@ type SongMenuAction = 'play-now' | 'toggle-favorite' | 'remove-song';
 type LyricsPanelKind = 'original' | 'translated';
 
 interface RendererElements {
+  sidebarToggleButton: HTMLButtonElement;
   addEndButton: HTMLButtonElement;
   addStartButton: HTMLButtonElement;
   insertPosition: HTMLInputElement;

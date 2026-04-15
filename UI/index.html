@@ -114,9 +114,22 @@
 
       <div class="workspace">
         <header class="topbar">
-          <div class="topbar-copy">
-            <p class="eyebrow">Tu musica</p>
-            <h2>Coleccion local</h2>
+          <div class="topbar-leading">
+            <button
+              id="sidebarToggleButton"
+              class="topbar-toggle"
+              type="button"
+              aria-label="Ocultar barra lateral"
+              aria-pressed="false"
+              title="Ocultar barra lateral"
+            >
+              <span class="topbar-toggle-icon" aria-hidden="true"></span>
+            </button>
+
+            <div class="topbar-copy">
+              <p class="eyebrow">Tu musica</p>
+              <h2>Coleccion local</h2>
+            </div>
           </div>
 
           <div class="topbar-tools">
@@ -372,6 +385,7 @@
 
     <script src="doubly-linked-playlist.js"></script>
     <script src="playlist-manager.js"></script>
+    <script src="song-lookup-utils.js"></script>
     <script src="lyrics-service.js"></script>
     <script src="translation-service.js"></script>
     <script src="renderer-dom.js"></script>

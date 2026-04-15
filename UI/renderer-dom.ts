@@ -13,6 +13,7 @@ function requireElement<TElement extends HTMLElement>(
 
 function createRendererElements(documentRef: Document): RendererElements {
   return {
+    sidebarToggleButton: requireElement<HTMLButtonElement>(documentRef, 'sidebarToggleButton'),
     addEndButton: requireElement<HTMLButtonElement>(documentRef, 'addEndButton'),
     addStartButton: requireElement<HTMLButtonElement>(documentRef, 'addStartButton'),
     insertPosition: requireElement<HTMLInputElement>(documentRef, 'insertPosition'),

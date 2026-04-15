@@ -1,4 +1,5 @@
 type AddSongsMode = 'start' | 'end' | 'position';
+const SIDEBAR_STORAGE_KEY = 'local-audio-player.sidebar-collapsed';
 
 document.addEventListener('DOMContentLoaded', () => {
   const playlistManager = new window.PlaylistManager(window.DoublyLinkedPlaylist);
@@ -92,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 
   wireEvents();
+  initializeSidebarState();
   renderPlaylists();
   renderPlaylist();
   syncPlayerInfo();
@@ -128,6 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function wireEvents(): void {
     electronAudioAPI.onMenuAudioFilesSelected((filePaths: string[]) => {
       addSongsFromPaths(filePaths, 'end');
+    });
+
+    elements.sidebarToggleButton.addEventListener('click', () => {
+      toggleSidebar();
     });
 
     elements.addEndButton.addEventListener('click', () => {
@@ -238,6 +244,46 @@ document.addEventListener('DOMContentLoaded', () => {
       onEnded: handleSongEnded,
       onError: handleAudioError,
     });
+  }
+
+  function initializeSidebarState(): void {
+    applySidebarCollapsedState(readSidebarPreference(), false);
+  }
+
+  function toggleSidebar(): void {
+    const isCurrentlyCollapsed = document.body.classList.contains('sidebar-collapsed');
+    applySidebarCollapsedState(!isCurrentlyCollapsed, true);
+  }
+
+  function applySidebarCollapsedState(collapsed: boolean, persist: boolean): void {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    elements.sidebarToggleButton.setAttribute('aria-pressed', String(collapsed));
+    elements.sidebarToggleButton.setAttribute(
+      'aria-label',
+      collapsed ? 'Mostrar barra lateral' : 'Ocultar barra lateral'
+    );
+    elements.sidebarToggleButton.title = collapsed ? 'Mostrar barra lateral' : 'Ocultar barra lateral';
+    elements.sidebarToggleButton.dataset.collapsed = String(collapsed);
+
+    if (persist) {
+      writeSidebarPreference(collapsed);
+    }
+  }
+
+  function readSidebarPreference(): boolean {
+    try {
+      return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function writeSidebarPreference(collapsed: boolean): void {
+    try {
+      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+    } catch (_error) {
+      // Ignore storage issues and keep the current session state.
+    }
   }
 
   function handlePlaylistListClick(event: MouseEvent): void {
@@ -833,14 +879,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const displayArtist = window.SongLookupUtils.getDisplayArtist(displaySong);
+    const displayFileName = window.SongLookupUtils.getDisplayFileName(displaySong) || displaySong.name;
     const favoriteSuffix = displaySong.isFavorite ? ' | Favorita' : '';
     const summarizedPath = summarizePath(displaySong.path);
+    const playerPrimaryMeta = displayArtist || `Archivo: ${displayFileName}`;
 
     elements.currentSongTitle.textContent = displaySong.title;
-    elements.currentSongMeta.textContent = `${displaySong.artist} | ${summarizedPath}${favoriteSuffix}`;
+    elements.currentSongMeta.textContent = `${playerPrimaryMeta} | ${summarizedPath}${favoriteSuffix}`;
     elements.playerSongTitle.textContent = displaySong.title;
     elements.playerSongMeta.textContent =
-      `${displaySong.sourceLabel}${favoriteSuffix} | ${displaySong.durationText} | ${summarizedPath}`;
+      `${playerPrimaryMeta} | ${displaySong.sourceLabel} | ${displaySong.durationText} | ${summarizedPath}${favoriteSuffix}`;
 
     updateArtwork(elements.heroArtwork, elements.heroArtworkInitials, displaySong);
     updateArtwork(elements.playerArtwork, elements.playerArtworkInitials, displaySong);

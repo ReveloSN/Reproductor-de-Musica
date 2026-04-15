@@ -1,3 +1,5 @@
+type LyricsPanelUiState = LookupStatus | 'loading';
+
 interface NowPlayingViewOptions {
   lyricsService: LyricsService;
   translationService: TranslationService;
@@ -15,6 +17,7 @@ class NowPlayingView {
   currentLyricsSongId: string;
   lyricsLoadToken: number;
   lyricsCache: Map<string, { original: LyricsResult; translation: TranslationResult }>;
+  lastFocusedElement: HTMLElement | null;
 
   constructor(elements: RendererElements, options: NowPlayingViewOptions) {
     this.elements = elements;
@@ -26,6 +29,7 @@ class NowPlayingView {
     this.currentLyricsSongId = '';
     this.lyricsLoadToken = 0;
     this.lyricsCache = new Map();
+    this.lastFocusedElement = null;
   }
 
   bindEvents(onOpenRequest: () => void): void {
@@ -53,11 +57,16 @@ class NowPlayingView {
       return false;
     }
 
+    this.lastFocusedElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.isNowPlayingOpen = true;
     this.elements.nowPlayingOverlay.classList.add('is-open');
     this.elements.nowPlayingOverlay.setAttribute('aria-hidden', 'false');
     document.body.classList.add('now-playing-open');
     this.sync(displaySong, modeSummary);
+    window.setTimeout(() => {
+      this.elements.closeNowPlayingButton.focus();
+    }, 0);
     return true;
   }
 
@@ -66,6 +75,7 @@ class NowPlayingView {
     this.elements.nowPlayingOverlay.classList.remove('is-open');
     this.elements.nowPlayingOverlay.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('now-playing-open');
+    (this.lastFocusedElement || this.elements.playerTrackTrigger).focus();
   }
 
   isOpen(): boolean {
@@ -94,11 +104,14 @@ class NowPlayingView {
       return;
     }
 
+    const displayArtist = window.SongLookupUtils.getDisplayArtist(displaySong);
+    const displayFileName = window.SongLookupUtils.getDisplayFileName(displaySong) || displaySong.name;
     const favoriteSuffix = displaySong.isFavorite ? ' | Favorita' : '';
+
     this.elements.expandedSongTitle.textContent = displaySong.title;
-    this.elements.expandedSongMeta.textContent = `${displaySong.artist}${favoriteSuffix}`;
+    this.elements.expandedSongMeta.textContent = `${displayArtist || `Archivo: ${displayFileName}`}${favoriteSuffix}`;
     this.elements.expandedSongContext.textContent =
-      `${displaySong.sourceLabel} | ${displaySong.durationText} | ${this.summarizePath(displaySong.path)}`;
+      `${displaySong.sourceLabel} | ${displaySong.durationText} | ${displayFileName} | ${this.summarizePath(displaySong.path)}`;
     this.elements.expandedModeSummary.textContent = modeSummary;
     this.updateArtwork(this.elements.expandedArtwork, this.elements.expandedArtworkInitials, displaySong);
 
@@ -186,43 +199,47 @@ class NowPlayingView {
   }
 
   private renderLyricsLoadingState(): void {
-    this.elements.lyricsOriginalStatus.textContent = 'Buscando letra...';
-    this.elements.lyricsOriginalContent.textContent = '';
-    this.elements.lyricsOriginalContent.classList.add('is-empty');
-    this.elements.lyricsTranslatedStatus.textContent = 'Preparando traduccion...';
-    this.elements.lyricsTranslatedContent.textContent = '';
-    this.elements.lyricsTranslatedContent.classList.add('is-empty');
+    this.setLyricsPanelState('original', 'loading', 'Buscando letra...', '');
+    this.setLyricsPanelState('translated', 'loading', 'Preparando traduccion...', '');
   }
 
   private renderLyricsResult(
     kind: LyricsPanelKind,
     result: LyricsResult | TranslationResult
   ): void {
-    const statusElement =
-      kind === 'original' ? this.elements.lyricsOriginalStatus : this.elements.lyricsTranslatedStatus;
-    const contentElement =
-      kind === 'original' ? this.elements.lyricsOriginalContent : this.elements.lyricsTranslatedContent;
     const text = kind === 'original'
       ? (result as LyricsResult).lyrics
       : (result as TranslationResult).translation;
 
     if (result.status === 'available') {
-      statusElement.textContent = 'Disponible';
-      contentElement.textContent = text;
-      contentElement.classList.remove('is-empty');
+      this.setLyricsPanelState(kind, 'available', 'Disponible', text);
       return;
     }
 
     if (result.status === 'error') {
-      statusElement.textContent = 'Error';
-      contentElement.textContent = result.message;
-      contentElement.classList.add('is-empty');
+      this.setLyricsPanelState(kind, 'error', 'Error', result.message);
       return;
     }
 
-    statusElement.textContent = 'Sin datos';
-    contentElement.textContent = result.message;
-    contentElement.classList.add('is-empty');
+    this.setLyricsPanelState(kind, 'empty', 'Sin datos', result.message);
+  }
+
+  private setLyricsPanelState(
+    kind: LyricsPanelKind,
+    state: LyricsPanelUiState,
+    statusText: string,
+    contentText: string
+  ): void {
+    const statusElement =
+      kind === 'original' ? this.elements.lyricsOriginalStatus : this.elements.lyricsTranslatedStatus;
+    const contentElement =
+      kind === 'original' ? this.elements.lyricsOriginalContent : this.elements.lyricsTranslatedContent;
+
+    statusElement.textContent = statusText;
+    statusElement.dataset.state = state;
+    contentElement.textContent = contentText;
+    contentElement.dataset.state = state;
+    contentElement.classList.toggle('is-empty', state !== 'available');
   }
 }
 

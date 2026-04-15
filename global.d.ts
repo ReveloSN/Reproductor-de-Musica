@@ -73,6 +73,7 @@ interface VersionsAPI {
 interface Window {
   audioAPI?: AudioAPI;
   versions: VersionsAPI;
+  SongLookupUtils: typeof SongLookupUtils;
   DoublyLinkedPlaylist: typeof DoublyLinkedPlaylist;
   PlaylistManager: typeof PlaylistManager;
   LyricsService: typeof LyricsService;
