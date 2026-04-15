@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'" />
+    <title>Local Audio Player</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="desktop-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">LP</div>
+          <div>
+            <p class="eyebrow">Electron local</p>
+            <h1>Local Audio Player</h1>
+          </div>
+        </div>
+
+        <p class="sidebar-lead">
+          Reproductor local con playlist doblemente enlazada, controles modernos y
+          barra fija persistente.
+        </p>
+
+        <nav class="nav-list" aria-label="Secciones">
+          <div class="nav-item">
+            <span class="nav-icon">01</span>
+            <div>
+              <strong>Biblioteca local</strong>
+              <span>Archivos desde tu dispositivo</span>
+            </div>
+          </div>
+          <div class="nav-item is-active">
+            <span class="nav-icon">02</span>
+            <div>
+              <strong>Playlist principal</strong>
+              <span>Lista doble activa</span>
+            </div>
+          </div>
+        </nav>
+
+        <section class="sidebar-card">
+          <div class="section-heading">
+            <p class="eyebrow">Carga</p>
+            <h2>Gestion de playlist</h2>
+            <p>Agrega canciones al inicio, final o en una posicion exacta.</p>
+          </div>
+
+          <div class="action-stack">
+            <button id="addEndButton" class="button button-primary">Agregar al final</button>
+            <button id="addStartButton" class="button button-secondary">
+              Agregar al inicio
+            </button>
+          </div>
+
+          <label class="field" for="insertPosition">
+            <span>Insertar en posicion</span>
+            <div class="field-row">
+              <input id="insertPosition" type="number" min="1" value="1" />
+              <button id="insertAtPositionButton" class="button button-secondary">
+                Insertar
+              </button>
+            </div>
+          </label>
+
+          <div class="format-chips">
+            <span>MP3</span>
+            <span>WAV</span>
+            <span>OGG</span>
+            <span>M4A</span>
+          </div>
+
+          <p id="feedbackMessage" class="feedback" role="status" aria-live="polite">
+            Carga canciones locales en MP3, WAV, OGG o M4A.
+          </p>
+        </section>
+
+        <section class="sidebar-card sidebar-card-soft">
+          <div class="section-heading">
+            <p class="eyebrow">Playlists</p>
+            <h2>Tus playlists</h2>
+            <p>
+              Crea playlists nuevas, cambia rapido entre listas y encuentra
+              "Mis favoritos" siempre disponible.
+            </p>
+          </div>
+
+          <div class="playlist-create-row">
+            <input
+              id="newPlaylistName"
+              type="text"
+              maxlength="40"
+              placeholder="Nueva playlist"
+              autocomplete="off"
+            />
+            <button
+              id="createPlaylistButton"
+              class="button button-primary button-square"
+              type="button"
+              title="Nueva playlist"
+            >
+              +
+            </button>
+          </div>
+
+          <p id="playlistHelperText" class="playlist-helper">
+            "Mis favoritos" se llena automaticamente con tus canciones marcadas.
+          </p>
+
+          <div id="playlistList" class="playlist-collection-list" aria-label="Tus playlists"></div>
+        </section>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div class="topbar-copy">
+            <p class="eyebrow">Tu musica</p>
+            <h2>Coleccion local</h2>
+          </div>
+
+          <div class="topbar-tools">
+            <label class="search-field" for="searchInput">
+              <span class="search-icon">&#8981;</span>
+              <input
+                id="searchInput"
+                type="search"
+                placeholder="Buscar por titulo, archivo, ruta o extension"
+                autocomplete="off"
+              />
+            </label>
+
+            <div class="topbar-chips">
+              <span id="playlistSummaryChip" class="status-chip">0 canciones</span>
+              <span id="modeSummaryChip" class="status-chip">Normal</span>
+            </div>
+          </div>
+        </header>
+
+        <main class="content">
+          <section class="hero-card">
+            <div id="heroArtwork" class="artwork artwork-hero">
+              <span id="heroArtworkInitials">LP</span>
+            </div>
+
+            <div class="hero-copy">
+              <p class="eyebrow">Playlist</p>
+              <h3 id="activePlaylistTitle">Playlist principal</h3>
+              <p id="activePlaylistDescription" class="hero-description">
+                Tu lista base para cargar, ordenar y reproducir archivos locales.
+              </p>
+
+              <div class="hero-meta">
+                <span id="playlistSummary">0 canciones</span>
+                <span id="playlistDurationLabel">Duracion conocida: 0:00</span>
+                <span id="currentPositionLabel">Nodo actual: sin seleccion</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="now-playing-card">
+            <div>
+              <p class="eyebrow">Ahora sonando</p>
+              <h3 id="currentSongTitle">Sin canciones cargadas</h3>
+              <p id="currentSongMeta" class="now-playing-meta">
+                Usa la barra lateral o el menu Archivo para cargar archivos locales.
+              </p>
+            </div>
+
+            <div class="state-badges">
+              <span id="playbackStatus" class="status-pill">En espera</span>
+              <span id="shuffleStateLabel" class="mode-pill">Shuffle off</span>
+              <span id="repeatStateLabel" class="mode-pill">Repeat off</span>
+            </div>
+          </section>
+
+          <section class="playlist-panel">
+            <div class="playlist-panel-header">
+              <div>
+                <h3 id="playlistPanelTitle">Playlist principal</h3>
+                <p id="playlistResultsLabel" class="playlist-results">
+                  Mostrando 0 canciones
+                </p>
+              </div>
+            </div>
+
+            <div class="table-header">
+              <span>#</span>
+              <span>Cancion</span>
+              <span>Origen</span>
+              <span>Duracion</span>
+              <span></span>
+            </div>
+
+            <ul id="playlist" class="playlist" aria-label="Playlist local"></ul>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <footer class="player-bar">
+      <div
+        id="playerTrackTrigger"
+        class="player-track player-track-clickable"
+        role="button"
+        tabindex="0"
+        aria-label="Abrir vista ampliada de la cancion actual"
+      >
+        <div id="playerArtwork" class="artwork artwork-player">
+          <span id="playerArtworkInitials">LP</span>
+        </div>
+
+        <div class="player-track-copy">
+          <h4 id="playerSongTitle">Sin reproduccion</h4>
+          <p id="playerSongMeta">Selecciona una cancion de la playlist.</p>
+        </div>
+      </div>
+
+      <div class="player-center">
+        <div class="transport-controls">
+          <button id="shuffleButton" class="transport-icon-button" type="button" title="Aleatorio">
+            <span class="transport-glyph">&#8644;</span>
+          </button>
+          <button id="previousButton" class="transport-icon-button" type="button" title="Anterior">
+            <span class="transport-glyph">&#9198;</span>
+          </button>
+          <button id="playButton" class="transport-main-button" type="button" title="Play / Pause">
+            <span id="playPauseGlyph" class="transport-glyph">&#9654;</span>
+          </button>
+          <button id="nextButton" class="transport-icon-button" type="button" title="Siguiente">
+            <span class="transport-glyph">&#9197;</span>
+          </button>
+          <button id="repeatButton" class="transport-icon-button" type="button" title="Repetir">
+            <span class="transport-glyph">&#8634;</span>
+            <span id="repeatIndicator" class="transport-badge">off</span>
+          </button>
+        </div>
+
+        <div class="progress-row">
+          <span id="currentTimeLabel">0:00</span>
+          <input id="progressSlider" type="range" min="0" max="100" value="0" />
+          <span id="durationLabel">0:00</span>
+        </div>
+      </div>
+
+      <div class="player-side">
+        <button id="stopButton" class="transport-secondary-button" type="button" title="Detener">
+          &#9632;
+        </button>
+
+        <div class="volume-group">
+          <span class="volume-label">Vol</span>
+          <input id="volumeSlider" type="range" min="0" max="100" value="70" />
+        </div>
+      </div>
+
+      <audio id="audioElement" preload="metadata"></audio>
+    </footer>
+
+    <section id="nowPlayingOverlay" class="now-playing-overlay" aria-hidden="true">
+      <div class="now-playing-shell" role="dialog" aria-modal="true" aria-labelledby="expandedSongTitle">
+        <button
+          id="closeNowPlayingButton"
+          class="now-playing-close-button"
+          type="button"
+          aria-label="Cerrar vista ampliada"
+        >
+          &times;
+        </button>
+
+        <div class="now-playing-expanded-grid">
+          <div class="now-playing-expanded-main">
+            <div id="expandedArtwork" class="artwork artwork-expanded">
+              <span id="expandedArtworkInitials">LP</span>
+            </div>
+
+            <div class="expanded-song-copy">
+              <p class="eyebrow">Now Playing</p>
+              <h2 id="expandedSongTitle">Sin cancion activa</h2>
+              <p id="expandedSongMeta" class="expanded-song-meta">
+                Selecciona una cancion para abrir esta vista.
+              </p>
+              <p id="expandedSongContext" class="expanded-song-context">
+                La letra y su traduccion apareceran aqui cuando esten disponibles.
+              </p>
+            </div>
+
+            <div class="expanded-state-row">
+              <span id="expandedPlaybackStatus" class="status-pill">En espera</span>
+              <span id="expandedModeSummary" class="mode-pill">Normal</span>
+            </div>
+
+            <div class="expanded-transport-controls">
+              <button
+                id="expandedShuffleButton"
+                class="transport-icon-button"
+                type="button"
+                title="Aleatorio"
+              >
+                <span class="transport-glyph">&#8644;</span>
+              </button>
+              <button
+                id="expandedPreviousButton"
+                class="transport-icon-button"
+                type="button"
+                title="Anterior"
+              >
+                <span class="transport-glyph">&#9198;</span>
+              </button>
+              <button
+                id="expandedPlayButton"
+                class="transport-main-button"
+                type="button"
+                title="Play / Pause"
+              >
+                <span id="expandedPlayPauseGlyph" class="transport-glyph">&#9654;</span>
+              </button>
+              <button
+                id="expandedNextButton"
+                class="transport-icon-button"
+                type="button"
+                title="Siguiente"
+              >
+                <span class="transport-glyph">&#9197;</span>
+              </button>
+              <button
+                id="expandedRepeatButton"
+                class="transport-icon-button"
+                type="button"
+                title="Repetir"
+              >
+                <span class="transport-glyph">&#8634;</span>
+                <span id="expandedRepeatIndicator" class="transport-badge">off</span>
+              </button>
+            </div>
+
+            <div class="expanded-progress-card">
+              <div class="progress-row progress-row-expanded">
+                <span id="expandedCurrentTimeLabel">0:00</span>
+                <input id="expandedProgressSlider" type="range" min="0" max="100" value="0" />
+                <span id="expandedDurationLabel">0:00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="lyrics-columns">
+            <section class="lyrics-card">
+              <div class="lyrics-card-header">
+                <p class="eyebrow">Letra original</p>
+                <h3>Original</h3>
+                <p id="lyricsOriginalStatus" class="lyrics-status">
+                  No se encontro letra para esta cancion.
+                </p>
+              </div>
+              <div id="lyricsOriginalContent" class="lyrics-content"></div>
+            </section>
+
+            <section class="lyrics-card">
+              <div class="lyrics-card-header">
+                <p class="eyebrow">Traduccion</p>
+                <h3>Version traducida</h3>
+                <p id="lyricsTranslatedStatus" class="lyrics-status">
+                  No hay traduccion disponible para esta cancion.
+                </p>
+              </div>
+              <div id="lyricsTranslatedContent" class="lyrics-content"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script src="doubly-linked-playlist.js"></script>
+    <script src="playlist-manager.js"></script>
+    <script src="lyrics-service.js"></script>
+    <script src="translation-service.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

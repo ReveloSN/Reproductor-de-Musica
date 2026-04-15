@@ -1,0 +1,54 @@
+{
+  "name": "electron-music-player",
+  "author": "JasonM",
+  "description": "Simple Electron music player that plays local music files",
+  "private": true,
+  "version": "0.0.0",
+  "main": "electron-music-player/dist/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "compile": "tsc",
+    "dist": "pnpm build && pnpm compile && electron-builder",
+    "electron": "tsc && electron electron-music-player/dist/main.js",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.yourname.musicplayer",       
+    "productName": "MusicPlayer",               
+    "directories": {
+      "buildResources": "assets",              
+      "output": "release"                      
+    },
+    "files": [
+      "electron-music-player/dist/**/*",       
+      "node_modules/**/*",                     
+      "package.json"                           
+    ],
+    "win": {
+      "target": "nsis"                       
+    }
+  },
+  "dependencies": {
+   
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react-swc": "^3.9.0",
+    "electron": "^36.2.1",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.25.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^16.0.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.30.1",
+    "vite": "^6.3.5"
+  }
+}
