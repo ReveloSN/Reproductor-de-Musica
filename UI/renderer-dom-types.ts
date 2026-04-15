@@ -27,6 +27,18 @@ interface RendererElements {
   playbackStatus: HTMLSpanElement;
   shuffleStateLabel: HTMLSpanElement;
   repeatStateLabel: HTMLSpanElement;
+  youtubeSearchInput: HTMLInputElement;
+  youtubeSearchButton: HTMLButtonElement;
+  youtubeSearchStatus: HTMLParagraphElement;
+  youtubeApiStatus: HTMLParagraphElement;
+  youtubePlaylistTarget: HTMLSelectElement;
+  youtubeResults: HTMLDivElement;
+  youtubePlayerSurface: HTMLDivElement;
+  youtubePlayerTarget: HTMLDivElement;
+  youtubePlayerStatus: HTMLParagraphElement;
+  youtubePlayerTitle: HTMLHeadingElement;
+  youtubePlayerMeta: HTMLParagraphElement;
+  youtubeOpenFallbackButton: HTMLButtonElement;
   playlist: HTMLUListElement;
   heroArtwork: HTMLDivElement;
   heroArtworkInitials: HTMLSpanElement;

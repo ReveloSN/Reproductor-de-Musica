@@ -5,6 +5,7 @@ interface ArtworkPalette {
 
 type WaveSurferConstructor = typeof import('wavesurfer.js').default;
 type WaveSurferInstance = import('wavesurfer.js').default;
+type TrackSource = 'local' | 'youtube';
 
 interface AudioFileMetadata {
   title: string | null;
@@ -19,6 +20,7 @@ interface AudioFileMetadata {
 
 interface Track {
   id: string;
+  source: TrackSource;
   name: string;
   fileName: string;
   path: string;
@@ -37,6 +39,10 @@ interface Track {
   artworkMimeType: string | null;
   genre: string | null;
   trackNumber: number | null;
+  youtubeVideoId: string | null;
+  youtubeUrl: string | null;
+  channelTitle: string | null;
+  publishedAt: string | null;
   isFavorite: boolean;
 }
 
@@ -85,6 +91,36 @@ interface PlaybackState {
   shuffleEnabled: boolean;
 }
 
+interface YouTubeConfig {
+  isConfigured: boolean;
+  message: string;
+}
+
+interface YouTubeVideoSummary {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  description: string;
+  publishedAt: string | null;
+  thumbnailUrl: string | null;
+  durationSeconds: number | null;
+  durationText: string;
+  youtubeUrl: string;
+}
+
+interface YouTubeSearchResponse {
+  status: LookupStatus;
+  results: YouTubeVideoSummary[];
+  message: string;
+  query: string;
+}
+
+interface YouTubeAPI {
+  getConfig: () => Promise<YouTubeConfig>;
+  searchVideos: (query: string) => Promise<YouTubeSearchResponse>;
+  openVideo: (url: string) => Promise<boolean>;
+}
+
 interface AudioAPI {
   openAudioFiles: () => Promise<string[]>;
   onMenuAudioFilesSelected: (callback: (filePaths: string[]) => void) => void;
@@ -103,8 +139,11 @@ interface VersionsAPI {
 
 interface Window {
   audioAPI?: AudioAPI;
+  youtubeAPI?: YouTubeAPI;
   versions: VersionsAPI;
   WaveSurfer?: WaveSurferConstructor;
+  YT?: YouTubeIframeApiNamespace;
+  onYouTubeIframeAPIReady?: () => void;
   SongLookupUtils: typeof SongLookupUtils;
   DoublyLinkedPlaylist: typeof DoublyLinkedPlaylist;
   PlaylistManager: typeof PlaylistManager;
@@ -117,4 +156,52 @@ interface Window {
   PlaybackController: typeof PlaybackController;
   SongFactory: typeof SongFactory;
   PlaylistActions: typeof PlaylistActions;
+  YoutubeSearchView: typeof YoutubeSearchView;
+  YoutubePlayerView: typeof YoutubePlayerView;
+}
+
+interface YouTubeIframePlayer {
+  destroy: () => void;
+  playVideo: () => void;
+  pauseVideo: () => void;
+  stopVideo: () => void;
+  mute: () => void;
+  unMute: () => void;
+  isMuted: () => boolean;
+  loadVideoById: (videoId: string | { videoId: string; startSeconds?: number }) => void;
+  cueVideoById: (videoId: string | { videoId: string; startSeconds?: number }) => void;
+  seekTo: (seconds: number, allowSeekAhead?: boolean) => void;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  getPlayerState: () => number;
+}
+
+interface YouTubeIframePlayerEvent {
+  target: YouTubeIframePlayer;
+  data: number;
+}
+
+interface YouTubeIframeApiNamespace {
+  Player: new (
+    elementId: string | HTMLElement,
+    options: {
+      videoId?: string;
+      width?: string | number;
+      height?: string | number;
+      playerVars?: Record<string, string | number>;
+      events?: {
+        onReady?: (event: YouTubeIframePlayerEvent) => void;
+        onStateChange?: (event: YouTubeIframePlayerEvent) => void;
+        onError?: (event: YouTubeIframePlayerEvent) => void;
+      };
+    }
+  ) => YouTubeIframePlayer;
+  PlayerState: {
+    UNSTARTED: -1;
+    ENDED: 0;
+    PLAYING: 1;
+    PAUSED: 2;
+    BUFFERING: 3;
+    CUED: 5;
+  };
 }

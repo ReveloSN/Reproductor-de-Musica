@@ -65,6 +65,18 @@ class WaveformController {
       return;
     }
 
+    if (song.source === 'youtube') {
+      this.currentSongId = '';
+      this.loadToken += 1;
+
+      if (this.waveSurfer) {
+        this.waveSurfer.empty();
+      }
+
+      this.setStatus('idle', 'La waveform está disponible solo para archivos locales.');
+      return;
+    }
+
     if (
       this.currentSongId === song.id &&
       this.elements.expandedWaveform.dataset.state !== 'error'

@@ -1,6 +1,31 @@
 type AddSongsMode = 'start' | 'end' | 'position';
 const SIDEBAR_STORAGE_KEY = 'local-audio-player.sidebar-collapsed';
 
+interface YouTubeSearchViewLike {
+  bindEvents: (callbacks: {
+    onSearch: (query: string) => void;
+    onPlay: (video: YouTubeVideoSummary) => void;
+    onOpen: (video: YouTubeVideoSummary) => void;
+    onAdd: (video: YouTubeVideoSummary, playlistId: string) => void;
+  }) => void;
+  syncPlaylistTargets: (playlists: PlaylistRecord[], activePlaylistId: string | null) => void;
+  renderConfig: (config: YouTubeConfig) => void;
+  renderSearchResponse: (response: YouTubeSearchResponse) => void;
+  setLoading: (query: string) => void;
+}
+
+interface YouTubePlayerViewLike {
+  currentTrack: Track | null;
+  loadTrack: (track: Track, options?: { autoplay?: boolean }) => Promise<boolean>;
+  play: () => void;
+  pause: () => void;
+  stop: () => void;
+  seekTo: (seconds: number) => void;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  destroy: () => void;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const playlistManager = new window.PlaylistManager(window.DoublyLinkedPlaylist);
   const lyricsService = new window.LyricsService();
@@ -26,10 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
   let shuffleEnabled = false;
   let repeatMode: RepeatMode = 'off';
   let shuffleHistory: string[] = [];
+  let activePlaybackSongId: string | null = null;
+  let activePlaybackSource: TrackSource | null = null;
+  let youtubeProgressTimer: number | null = null;
 
   const elements = window.createRendererElements(document);
   const playlistView = new window.PlaylistView(document, elements);
   const waveformController = new window.WaveformController(elements, elements.audioElement);
+  const youtubeSearchView = createYouTubeSearchView();
+  const youtubePlayerView = createYouTubePlayerView();
   const nowPlayingView = new window.NowPlayingView(elements, {
     lyricsService,
     translationService,
@@ -38,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const playbackController = new window.PlaybackController(elements, formatDuration);
   const audioAPI = window.audioAPI;
+  const youtubeAPI = window.youtubeAPI;
 
   if (!audioAPI) {
     setFeedback(
@@ -48,6 +79,93 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const electronAudioAPI: AudioAPI = audioAPI;
+
+  function createYouTubeSearchView(): YouTubeSearchViewLike {
+    try {
+      return new window.YoutubeSearchView(document, elements);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      markYouTubeModuleUnavailable(`No fue posible iniciar la busqueda de YouTube: ${message}`);
+      return {
+        bindEvents: () => {
+          // The YouTube module is unavailable in this session.
+        },
+        syncPlaylistTargets: (playlists, activePlaylistId) => {
+          const selectedId = activePlaylistId || 'main';
+          elements.youtubePlaylistTarget.replaceChildren(
+            ...playlists.map((playlist) => {
+              const option = document.createElement('option');
+              option.value = playlist.id;
+              option.textContent = playlist.name;
+              option.selected = playlist.id === selectedId;
+              return option;
+            })
+          );
+        },
+        renderConfig: (config) => {
+          elements.youtubeApiStatus.textContent = config.message;
+        },
+        renderSearchResponse: (response) => {
+          elements.youtubeSearchStatus.textContent = response.message;
+          elements.youtubeResults.replaceChildren();
+        },
+        setLoading: (query) => {
+          elements.youtubeSearchStatus.textContent = query
+            ? `Buscando en YouTube: "${query}"...`
+            : 'Buscando videos en YouTube...';
+        },
+      };
+    }
+  }
+
+  function createYouTubePlayerView(): YouTubePlayerViewLike {
+    try {
+      return new window.YoutubePlayerView(document, elements, {
+        onStateChange: handleYouTubePlayerStateChange,
+        onEnded: handleSongEnded,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      markYouTubeModuleUnavailable(`No fue posible iniciar el player de YouTube: ${message}`);
+      return {
+        currentTrack: null,
+        async loadTrack(): Promise<boolean> {
+          elements.youtubePlayerStatus.textContent =
+            'El player de YouTube no esta disponible en esta sesion.';
+          return false;
+        },
+        play: () => {
+          // The YouTube module is unavailable in this session.
+        },
+        pause: () => {
+          // The YouTube module is unavailable in this session.
+        },
+        stop: () => {
+          // The YouTube module is unavailable in this session.
+        },
+        seekTo: () => {
+          // The YouTube module is unavailable in this session.
+        },
+        getCurrentTime: () => 0,
+        getDuration: () => 0,
+        destroy: () => {
+          // The YouTube module is unavailable in this session.
+        },
+      };
+    }
+  }
+
+  function markYouTubeModuleUnavailable(message: string): void {
+    elements.youtubeApiStatus.textContent = message;
+    elements.youtubeSearchStatus.textContent =
+      'El modulo de YouTube fallo al arrancar. La musica local sigue disponible.';
+    elements.youtubePlayerStatus.textContent =
+      'El reproductor embebido de YouTube no pudo inicializarse.';
+    elements.youtubePlayerSurface.dataset.state = 'error';
+    elements.youtubeSearchInput.disabled = true;
+    elements.youtubeSearchButton.disabled = true;
+    elements.youtubeResults.replaceChildren();
+  }
 
   const songFactory = new window.SongFactory({
     audioAPI,
@@ -81,6 +199,8 @@ document.addEventListener('DOMContentLoaded', () => {
         songFactory.probeSongMetadata(song);
       },
       pushShuffleHistory,
+      playTrack,
+      clearPlayback,
       renderPlaylists,
       renderPlaylist,
       syncPlayerInfo,
@@ -104,6 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setPlaybackStatus('En espera');
   setPlayButtonState(false);
   syncNowPlayingView();
+  void initializeYouTubeModule();
 
   function getActivePlaylistRecord(): PlaylistRecord | null {
     return playlistManager.getActivePlaylist();
@@ -115,8 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getPlayingSong(): Track | null {
-    const songId = playbackController.getLoadedSongId();
-    return songId ? playlistManager.getSongById(songId) : null;
+    return activePlaybackSongId ? playlistManager.getSongById(activePlaybackSongId) : null;
   }
 
   function getDisplaySong(): Track | null {
@@ -131,6 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function wireEvents(): void {
     window.addEventListener('beforeunload', () => {
       waveformController.destroy();
+      youtubePlayerView.destroy();
+      stopYoutubeProgressLoop();
     });
 
     electronAudioAPI.onMenuAudioFilesSelected((filePaths: string[]) => {
@@ -175,6 +297,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     elements.playlistList.addEventListener('click', handlePlaylistListClick);
     nowPlayingView.bindEvents(openNowPlayingView);
+    youtubeSearchView.bindEvents({
+      onSearch: (query) => {
+        void searchYouTubeVideos(query);
+      },
+      onPlay: (video) => {
+        playYouTubeVideo(video, true, true);
+      },
+      onOpen: (video) => {
+        void openYouTubeVideo(video, true);
+      },
+      onAdd: (video, playlistId) => {
+        addYouTubeVideoToPlaylist(video, playlistId);
+      },
+    });
+    elements.youtubeOpenFallbackButton.addEventListener('click', () => {
+      void openCurrentYouTubeTrackExternally();
+    });
 
     elements.searchInput.addEventListener('input', () => {
       searchTerm = elements.searchInput.value.trim().toLowerCase();
@@ -224,14 +363,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     elements.stopButton.addEventListener('click', () => {
-      if (!getPlayingSong()) {
+      const currentSong = getPlayingSong();
+
+      if (!currentSong) {
         setFeedback('No hay una cancion activa para detener.', 'error');
         return;
       }
 
-      suppressPauseStatus();
-      elements.audioElement.pause();
-      elements.audioElement.currentTime = 0;
+      if (currentSong.source === 'youtube') {
+        youtubePlayerView.stop();
+        stopYoutubeProgressLoop();
+      } else {
+        suppressPauseStatus();
+        elements.audioElement.pause();
+        elements.audioElement.currentTime = 0;
+      }
+
       updatePlaybackProgress();
       setPlayButtonState(false);
       setPlaybackStatus('Detenido');
@@ -242,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', handleDocumentClick);
     document.addEventListener('keydown', handleKeydown);
     playbackController.bindEvents({
+      onSeek: handleSeek,
       onLoadedMetadata: handleLoadedMetadata,
       onTimeUpdate: updatePlaybackProgress,
       onPlay: handlePlay,
@@ -288,6 +436,63 @@ document.addEventListener('DOMContentLoaded', () => {
       window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
     } catch (_error) {
       // Ignore storage issues and keep the current session state.
+    }
+  }
+
+  async function initializeYouTubeModule(): Promise<void> {
+    youtubeSearchView.syncPlaylistTargets(playlistManager.getPlaylists(), playlistManager.activePlaylistId);
+
+    if (!youtubeAPI) {
+      youtubeSearchView.renderConfig({
+        isConfigured: false,
+        message: 'No se encontró la integración segura de YouTube en preload/main.',
+      });
+      return;
+    }
+
+    try {
+      const config = await youtubeAPI.getConfig();
+      youtubeSearchView.renderConfig(config);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      youtubeSearchView.renderConfig({
+        isConfigured: false,
+        message: `No fue posible iniciar el modulo de YouTube: ${message}`,
+      });
+    }
+  }
+
+  async function searchYouTubeVideos(query: string): Promise<void> {
+    if (!youtubeAPI) {
+      youtubeSearchView.renderConfig({
+        isConfigured: false,
+        message: 'No se encontró la integración segura de YouTube en preload/main.',
+      });
+      return;
+    }
+
+    if (!query.trim()) {
+      youtubeSearchView.renderSearchResponse({
+        status: 'empty',
+        results: [],
+        message: 'Escribe algo para buscar videos musicales en YouTube.',
+        query,
+      });
+      return;
+    }
+
+    youtubeSearchView.setLoading(query);
+    try {
+      const response = await youtubeAPI.searchVideos(query);
+      youtubeSearchView.renderSearchResponse(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      youtubeSearchView.renderSearchResponse({
+        status: 'error',
+        results: [],
+        message: `No fue posible consultar YouTube: ${message}`,
+        query,
+      });
     }
   }
 
@@ -465,7 +670,32 @@ document.addEventListener('DOMContentLoaded', () => {
     nowPlayingView.sync(getDisplaySong(), getModeSummaryLabel());
   }
 
+  function handleSeek(seconds: number): void {
+    const currentSong = getPlayingSong();
+
+    if (!currentSong) {
+      return;
+    }
+
+    if (currentSong.source === 'youtube') {
+      youtubePlayerView.seekTo(seconds);
+      updatePlaybackProgress();
+      return;
+    }
+
+    if (!Number.isFinite(elements.audioElement.duration)) {
+      return;
+    }
+
+    elements.audioElement.currentTime = seconds;
+    updatePlaybackProgress();
+  }
+
   function handleLoadedMetadata(): void {
+    if (activePlaybackSource !== 'local') {
+      return;
+    }
+
     const currentSong = getPlayingSong();
 
     if (currentSong && Number.isFinite(elements.audioElement.duration)) {
@@ -479,6 +709,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handlePlay(): void {
+    if (activePlaybackSource !== 'local') {
+      return;
+    }
+
     setPlayButtonState(true);
     setPlaybackStatus('Reproduciendo');
     renderPlaylist();
@@ -486,6 +720,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handlePause(): void {
+    if (activePlaybackSource !== 'local') {
+      return;
+    }
+
     setPlayButtonState(false);
 
     if (pauseStatusSuppressed) {
@@ -501,6 +739,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleAudioError(): void {
+    if (activePlaybackSource !== 'local') {
+      return;
+    }
+
     setPlayButtonState(false);
     setPlaybackStatus('Error de audio');
     waveformController.clearError(
@@ -512,6 +754,72 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     renderPlaylist();
     syncPlayerInfo();
+  }
+
+  function handleYouTubePlayerStateChange(change: YouTubePlayerStateChange): void {
+    const youtubeTrack = youtubePlayerView.currentTrack;
+
+    if (!youtubeTrack) {
+      return;
+    }
+
+    if (change.state === 'playing') {
+      activePlaybackSongId = youtubeTrack.id;
+      activePlaybackSource = 'youtube';
+      suppressPauseStatus();
+      elements.audioElement.pause();
+      startYoutubeProgressLoop();
+      setPlayButtonState(true);
+      setPlaybackStatus('Reproduciendo');
+      updatePlaybackProgress();
+      renderPlaylist();
+      syncPlayerInfo();
+      return;
+    }
+
+    if (activePlaybackSource !== 'youtube' || activePlaybackSongId !== youtubeTrack.id) {
+      return;
+    }
+
+    if (change.state === 'paused') {
+      stopYoutubeProgressLoop();
+      setPlayButtonState(false);
+      setPlaybackStatus('Pausado');
+      updatePlaybackProgress();
+      renderPlaylist();
+      syncPlayerInfo();
+      return;
+    }
+
+    if (change.state === 'ended') {
+      stopYoutubeProgressLoop();
+      setPlayButtonState(false);
+      updatePlaybackProgress();
+      return;
+    }
+
+    if (change.state === 'error') {
+      stopYoutubeProgressLoop();
+      setPlayButtonState(false);
+      setPlaybackStatus('Error de YouTube');
+      setFeedback(`${change.message} Si no arranca en la app, usa "Abrir en YouTube".`, 'error');
+      renderPlaylist();
+      syncPlayerInfo();
+      return;
+    }
+
+    if (change.state === 'loading') {
+      setPlaybackStatus('Cargando YouTube');
+      return;
+    }
+
+    if (change.state === 'ready') {
+      updatePlaybackProgress();
+
+      if (elements.playButton.dataset.state !== 'pause') {
+        setPlaybackStatus('Seleccionada');
+      }
+    }
   }
 
   async function pickFilesAndAdd(
@@ -614,10 +922,306 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
+  function addYouTubeVideoToPlaylist(video: YouTubeVideoSummary, playlistId: string): void {
+    const playlist = playlistManager.getPlaylist(playlistId);
+
+    if (!playlist) {
+      setFeedback('No fue posible encontrar la playlist destino para YouTube.', 'error');
+      return;
+    }
+
+    const track = playlistManager.getOrCreateSong(songFactory.createYouTubeTrack(video));
+
+    if (!playlistManager.addSongToPlaylist(playlist.id, track)) {
+      setFeedback(`"${track.title}" ya estaba en "${playlist.name}".`, 'error');
+      return;
+    }
+
+    if (playlist.id === playlistManager.activePlaylistId && !playlist.list.getCurrentSong()) {
+      playlist.list.setCurrentByPosition(0);
+    }
+
+    renderPlaylists();
+    renderPlaylist();
+    syncPlayerInfo();
+    updatePositionInputs();
+    setFeedback(`"${track.title}" fue agregada a "${playlist.name}" desde YouTube.`, 'success');
+  }
+
+  function playYouTubeVideo(
+    video: YouTubeVideoSummary,
+    autoplay = true,
+    announce = true
+  ): void {
+    const activePlaylist = getActivePlaylistRecord();
+    const targetPlaylistId =
+      activePlaylist && !activePlaylist.isFavorites ? activePlaylist.id : 'main';
+    const targetPlaylist = playlistManager.getPlaylist(targetPlaylistId);
+    const track = playlistManager.getOrCreateSong(songFactory.createYouTubeTrack(video));
+
+    if (targetPlaylist) {
+      if (!playlistManager.hasSong(targetPlaylistId, track.id)) {
+        playlistManager.addSongToPlaylist(targetPlaylistId, track);
+      }
+
+      const trackIndex = playlistManager.findSongIndex(targetPlaylistId, track.id);
+
+      if (trackIndex !== -1) {
+        targetPlaylist.list.setCurrentByPosition(trackIndex);
+      }
+    }
+
+    void playYouTubeTrack(track, { autoplay, announce });
+  }
+
+  async function openYouTubeVideo(video: YouTubeVideoSummary, announce = true): Promise<void> {
+    const activePlaylist = getActivePlaylistRecord();
+    const targetPlaylistId =
+      activePlaylist && !activePlaylist.isFavorites ? activePlaylist.id : 'main';
+    const targetPlaylist = playlistManager.getPlaylist(targetPlaylistId);
+    const track = playlistManager.getOrCreateSong(songFactory.createYouTubeTrack(video));
+
+    if (targetPlaylist) {
+      if (!playlistManager.hasSong(targetPlaylistId, track.id)) {
+        playlistManager.addSongToPlaylist(targetPlaylistId, track);
+      }
+
+      const trackIndex = playlistManager.findSongIndex(targetPlaylistId, track.id);
+
+      if (trackIndex !== -1) {
+        targetPlaylist.list.setCurrentByPosition(trackIndex);
+      }
+    }
+
+    await showYouTubeTrackSelection(track);
+    const opened = await openYouTubeExternally(track.youtubeUrl || track.url);
+
+    if (!opened) {
+      setFeedback(`No fue posible abrir "${track.title}" en YouTube.`, 'error');
+      return;
+    }
+
+    setPlaybackStatus('Abierto en YouTube');
+
+    if (announce) {
+      setFeedback(`"${track.title}" se abrio en YouTube.`, 'success');
+    }
+  }
+
+  function clearPlayback(): void {
+    activePlaybackSongId = null;
+    activePlaybackSource = null;
+    stopYoutubeProgressLoop();
+    suppressPauseStatus();
+    elements.audioElement.pause();
+    playbackController.clearSource();
+    youtubePlayerView.stop();
+    updatePlaybackProgress();
+  }
+
+  function playTrack(song: Track, { autoplay = true, announce = true }: LoadSongOptions = {}): void {
+    if (song.source === 'youtube') {
+      void playYouTubeTrack(song, { autoplay, announce });
+      return;
+    }
+
+    playLocalTrack(song, { autoplay, announce });
+  }
+
+  function playLocalTrack(song: Track, { autoplay = true, announce = true }: LoadSongOptions = {}): void {
+    stopYoutubeProgressLoop();
+    youtubePlayerView.pause();
+    activePlaybackSongId = song.id;
+    activePlaybackSource = 'local';
+    playbackController.syncCurrentSong(song);
+    renderPlaylists();
+    renderPlaylist();
+    syncPlayerInfo();
+    updatePlaybackProgress();
+
+    if (!autoplay) {
+      setPlayButtonState(false);
+      setPlaybackStatus('Seleccionada');
+      return;
+    }
+
+    const playPromise = elements.audioElement.play();
+
+    if (playPromise && typeof playPromise.catch === 'function') {
+      void playPromise
+        .then(() => {
+          setPlayButtonState(true);
+          setPlaybackStatus('Reproduciendo');
+          renderPlaylist();
+          syncPlayerInfo();
+
+          if (announce) {
+            setFeedback(`Reproduciendo "${song.title}".`, 'success');
+          }
+        })
+        .catch(() => {
+          setPlayButtonState(false);
+          setPlaybackStatus('Error de audio');
+          setFeedback(
+            `Electron no pudo reproducir "${song.title}". Revisa el archivo o prueba otro formato compatible.`,
+            'error'
+          );
+        });
+    }
+  }
+
+  async function showYouTubeTrackSelection(song: Track): Promise<void> {
+    if (!song.youtubeVideoId) {
+      setFeedback(`"${song.title}" no tiene un video de YouTube valido.`, 'error');
+      return;
+    }
+
+    clearPlayback();
+    setPlayButtonState(false);
+    setPlaybackStatus('Seleccionada');
+    renderPlaylists();
+    renderPlaylist();
+    syncPlayerInfo();
+    updatePlaybackProgress();
+
+    const loaded = await youtubePlayerView.loadTrack(song, { autoplay: false });
+
+    if (!loaded) {
+      setPlaybackStatus('Error de YouTube');
+      renderPlaylist();
+      syncPlayerInfo();
+      return;
+    }
+  }
+
+  async function playYouTubeTrack(
+    song: Track,
+    { autoplay = true, announce = true }: LoadSongOptions = {}
+  ): Promise<void> {
+    if (!song.youtubeVideoId) {
+      setFeedback(`"${song.title}" no tiene un video de YouTube valido para reproducir.`, 'error');
+      return;
+    }
+
+    activePlaybackSongId = song.id;
+    activePlaybackSource = 'youtube';
+    stopYoutubeProgressLoop();
+    suppressPauseStatus();
+    elements.audioElement.pause();
+    setPlayButtonState(false);
+    setPlaybackStatus(autoplay ? 'Cargando YouTube' : 'Seleccionada');
+    renderPlaylists();
+    renderPlaylist();
+    syncPlayerInfo();
+    updatePlaybackProgress();
+
+    const loaded = await youtubePlayerView.loadTrack(song, { autoplay });
+
+    if (!loaded) {
+      setPlaybackStatus('Error de YouTube');
+      renderPlaylist();
+      syncPlayerInfo();
+      return;
+    }
+
+    updatePlaybackProgress();
+
+    if (!autoplay) {
+      setPlaybackStatus('Seleccionada');
+      return;
+    }
+
+    if (announce) {
+      setFeedback(`Intentando reproducir "${song.title}" en la app. Si falla, usa "Abrir en YouTube".`, 'success');
+    }
+  }
+
+  async function openYouTubeExternally(url: string): Promise<boolean> {
+    const targetUrl = String(url || '').trim();
+
+    if (!targetUrl || !youtubeAPI) {
+      return false;
+    }
+
+    try {
+      return await youtubeAPI.openVideo(targetUrl);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  async function openCurrentYouTubeTrackExternally(): Promise<void> {
+    const youtubeTrack =
+      youtubePlayerView.currentTrack ||
+      (getDisplaySong()?.source === 'youtube' ? getDisplaySong() : null);
+
+    if (!youtubeTrack?.youtubeUrl && !youtubeTrack?.url) {
+      setFeedback('No hay un track de YouTube listo para abrir.', 'error');
+      return;
+    }
+
+    const opened = await openYouTubeExternally(youtubeTrack.youtubeUrl || youtubeTrack.url);
+
+    if (!opened) {
+      setFeedback(`No fue posible abrir "${youtubeTrack.title}" en YouTube.`, 'error');
+      return;
+    }
+
+    setPlaybackStatus('Abierto en YouTube');
+    setFeedback(`"${youtubeTrack.title}" se abrio en YouTube.`, 'success');
+  }
+
+  function startYoutubeProgressLoop(): void {
+    if (youtubeProgressTimer !== null) {
+      return;
+    }
+
+    youtubeProgressTimer = window.setInterval(() => {
+      if (activePlaybackSource === 'youtube') {
+        updatePlaybackProgress();
+      }
+    }, 400);
+  }
+
+  function stopYoutubeProgressLoop(): void {
+    if (youtubeProgressTimer === null) {
+      return;
+    }
+
+    window.clearInterval(youtubeProgressTimer);
+    youtubeProgressTimer = null;
+  }
+
+  function seekActiveTrackToStart(): void {
+    const currentSong = getPlayingSong();
+
+    if (!currentSong) {
+      return;
+    }
+
+    if (currentSong.source === 'youtube') {
+      youtubePlayerView.seekTo(0);
+      return;
+    }
+
+    elements.audioElement.currentTime = 0;
+  }
+
   function togglePlayPause(): void {
     const playingSong = getPlayingSong();
 
     if (playingSong) {
+      if (playingSong.source === 'youtube') {
+        if (elements.playButton.dataset.state === 'play') {
+          resumeLoadedSong();
+          return;
+        }
+
+        youtubePlayerView.pause();
+        setPlaybackStatus('Pausado');
+        return;
+      }
+
       if (elements.audioElement.paused) {
         resumeLoadedSong();
         return;
@@ -643,6 +1247,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!playingSong) {
       playlistActions.loadSongFromActivePlaylist({ autoplay: true, announce });
+      return;
+    }
+
+    if (playingSong.source === 'youtube') {
+      youtubePlayerView.play();
+      startYoutubeProgressLoop();
+      setPlayButtonState(true);
+      setPlaybackStatus('Reproduciendo');
+      updatePlaybackProgress();
+      renderPlaylist();
+      syncPlayerInfo();
+
+      if (announce) {
+        setFeedback(`Reproduciendo "${playingSong.title}" desde YouTube.`, 'success');
+      }
+
       return;
     }
 
@@ -682,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (repeatMode === 'one' && fromEnded) {
-      elements.audioElement.currentTime = 0;
+      seekActiveTrackToStart();
       resumeLoadedSong(false);
       return true;
     }
@@ -789,8 +1409,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    suppressPauseStatus();
-    elements.audioElement.currentTime = 0;
+    if (activePlaybackSource === 'youtube') {
+      stopYoutubeProgressLoop();
+      youtubePlayerView.seekTo(0);
+    } else {
+      suppressPauseStatus();
+      elements.audioElement.currentTime = 0;
+    }
+
     updatePlaybackProgress();
     setPlayButtonState(false);
     setPlaybackStatus('Lista completada');
@@ -831,12 +1457,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const searchable = [
         song.title,
         song.artist,
+        song.channelTitle || '',
         song.album || '',
         song.fileName,
         song.path,
         song.extension,
         song.genre || '',
         song.sourceLabel,
+        song.youtubeUrl || '',
       ]
         .join(' ')
         .toLowerCase();
@@ -845,10 +1473,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderPlaylists(): void {
+    const playlists = playlistManager.getPlaylists();
+
     playlistView.renderPlaylists({
-      playlists: playlistManager.getPlaylists(),
+      playlists,
       activePlaylistId: playlistManager.activePlaylistId,
     });
+    youtubeSearchView.syncPlaylistTargets(playlists, playlistManager.activePlaylistId);
   }
 
   function renderPlaylist(): void {
@@ -901,9 +1532,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!displaySong) {
       elements.currentSongTitle.textContent = 'Sin canciones cargadas';
       elements.currentSongMeta.textContent =
-        'Usa la barra lateral o el menu Archivo para cargar archivos locales.';
+        'Usa la barra lateral para archivos locales o el modulo de YouTube para buscar videos.';
       elements.playerSongTitle.textContent = 'Sin reproduccion';
-      elements.playerSongMeta.textContent = 'Selecciona una cancion de la playlist.';
+      elements.playerSongMeta.textContent = 'Selecciona una cancion local o un track de YouTube.';
       updateArtwork(elements.heroArtwork, elements.heroArtworkInitials, null);
       updateArtwork(elements.playerArtwork, elements.playerArtworkInitials, null);
       waveformController.syncSong(null);
@@ -994,7 +1625,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updatePlaybackProgress(): void {
     const currentSong = getDisplaySong();
-    playbackController.updateProgress(currentSong ? currentSong.durationSeconds : null);
+
+    if (currentSong?.source === 'youtube' && activePlaybackSource === 'youtube') {
+      const currentTimeSeconds = youtubePlayerView.getCurrentTime();
+      const liveDuration = youtubePlayerView.getDuration();
+      const durationSeconds =
+        Number.isFinite(liveDuration) && liveDuration > 0
+          ? liveDuration
+          : currentSong.durationSeconds;
+
+      if (typeof durationSeconds === 'number' && Number.isFinite(durationSeconds) && durationSeconds > 0) {
+        currentSong.durationSeconds = durationSeconds;
+        currentSong.durationText = formatDuration(durationSeconds);
+      }
+
+      playbackController.updateProgress({
+        currentTimeSeconds,
+        durationSeconds: typeof durationSeconds === 'number' ? durationSeconds : 0,
+        fallbackDurationSeconds: currentSong.durationSeconds,
+      });
+      return;
+    }
+
+    playbackController.updateProgress({
+      fallbackDurationSeconds: currentSong ? currentSong.durationSeconds : null,
+    });
   }
 
   function readOneBasedPosition(inputElement: HTMLInputElement, maxValue: number): number | null {
@@ -1058,6 +1713,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function summarizePath(filePath: string): string {
     const normalizedPath = String(filePath).replace(/\\/g, '/');
+
+    if (/^https?:\/\/(www\.)?youtube\.com\/watch/i.test(normalizedPath)) {
+      return normalizedPath.replace(/^https?:\/\//i, '');
+    }
+
     const parts = normalizedPath.split('/').filter(Boolean);
 
     if (parts.length <= 2) {

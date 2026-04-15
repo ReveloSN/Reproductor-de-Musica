@@ -12,6 +12,8 @@ interface PlaylistActionsCallbacks {
   pushShuffleHistory: (songId: string) => void;
   renderPlaylists: () => void;
   renderPlaylist: () => void;
+  playTrack: (song: Track, options?: LoadSongOptions) => void;
+  clearPlayback: () => void;
   syncPlayerInfo: () => void;
   updatePositionInputs: () => void;
   updatePlaybackProgress: () => void;
@@ -59,13 +61,16 @@ class PlaylistActions {
   }
 
   syncCurrentSongSource(song: Track | null): void {
-    this.playbackController.syncCurrentSong(song);
+    if (!song) {
+      this.callbacks.clearPlayback();
+      return;
+    }
+
+    this.callbacks.playTrack(song, { autoplay: false, announce: false });
   }
 
   clearPlayer(): void {
-    this.callbacks.suppressPauseStatus();
-    this.elements.audioElement.pause();
-    this.playbackController.clearSource();
+    this.callbacks.clearPlayback();
     this.callbacks.setPlayButtonState(false);
     this.callbacks.renderPlaylists();
     this.callbacks.renderPlaylist();
@@ -88,39 +93,7 @@ class PlaylistActions {
       return;
     }
 
-    this.syncCurrentSongSource(currentSong);
-    this.callbacks.renderPlaylists();
-    this.callbacks.renderPlaylist();
-    this.callbacks.syncPlayerInfo();
-    this.callbacks.updatePlaybackProgress();
-
-    if (!autoplay) {
-      this.callbacks.setPlayButtonState(false);
-      this.callbacks.setPlaybackStatus('Seleccionada');
-      return;
-    }
-
-    const playPromise = this.elements.audioElement.play();
-
-    if (playPromise && typeof playPromise.catch === 'function') {
-      void playPromise
-        .then(() => {
-          this.callbacks.setPlayButtonState(true);
-          this.callbacks.setPlaybackStatus('Reproduciendo');
-
-          if (announce) {
-            this.callbacks.setFeedback(`Reproduciendo "${currentSong.title}".`, 'success');
-          }
-        })
-        .catch(() => {
-          this.callbacks.setPlayButtonState(false);
-          this.callbacks.setPlaybackStatus('Error de audio');
-          this.callbacks.setFeedback(
-            `Electron no pudo reproducir "${currentSong.title}". Revisa el archivo o prueba otro formato compatible.`,
-            'error'
-          );
-        });
-    }
+    this.callbacks.playTrack(currentSong, { autoplay, announce });
   }
 
   handleSongMenuAction(action: SongMenuAction, index: number, shuffleEnabled: boolean): void {
@@ -250,7 +223,7 @@ class PlaylistActions {
     const playingSong = this.callbacks.getPlayingSong();
     const removedCurrentSong = Boolean(currentSong && currentSong.id === songToRemove.id);
     const removedPlayingSong = Boolean(playingSong && playingSong.id === songToRemove.id);
-    const wasPlaying = removedPlayingSong && !this.elements.audioElement.paused;
+    const wasPlaying = removedPlayingSong && this.elements.playButton.dataset.state === 'pause';
     const removedSong = this.playlistManager.removeSongFromPlaylist(activePlaylist.id, songToRemove.id);
 
     if (activeList.isEmpty()) {

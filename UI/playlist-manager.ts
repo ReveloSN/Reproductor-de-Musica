@@ -20,7 +20,7 @@ class PlaylistManager<TTrack extends Track = Track> {
   playlists: Map<string, PlaylistRecord<TTrack>>;
   playlistOrder: string[];
   songLibraryById: Map<string, TTrack>;
-  songLibraryByPath: Map<string, TTrack>;
+  songLibraryByKey: Map<string, TTrack>;
   activePlaylistId: string | null;
 
   constructor(PlaylistClass: new () => DoublyLinkedPlaylist<TTrack>) {
@@ -28,7 +28,7 @@ class PlaylistManager<TTrack extends Track = Track> {
     this.playlists = new Map();
     this.playlistOrder = [];
     this.songLibraryById = new Map();
-    this.songLibraryByPath = new Map();
+    this.songLibraryByKey = new Map();
     this.activePlaylistId = null;
 
     this.createPlaylist('Playlist principal', {
@@ -141,10 +141,20 @@ class PlaylistManager<TTrack extends Track = Track> {
     return this.songLibraryById.get(songId) || null;
   }
 
+  getSongLibraryKey(songData: Pick<Track, 'source' | 'path' | 'youtubeVideoId' | 'id'>): string {
+    if (songData.source === 'youtube' && songData.youtubeVideoId) {
+      return `youtube:${songData.youtubeVideoId}`;
+    }
+
+    return `local:${songData.path || songData.id}`;
+  }
+
   getOrCreateSong(songData: TTrack): TTrack {
-    const existingSong = this.songLibraryByPath.get(songData.path);
+    const songKey = this.getSongLibraryKey(songData);
+    const existingSong = this.songLibraryByKey.get(songKey);
 
     if (existingSong) {
+      existingSong.source = songData.source || existingSong.source;
       existingSong.name = songData.name || existingSong.name;
       existingSong.fileName = songData.fileName || existingSong.fileName;
       existingSong.path = songData.path || existingSong.path;
@@ -152,15 +162,19 @@ class PlaylistManager<TTrack extends Track = Track> {
       existingSong.url = songData.url || existingSong.url;
       existingSong.title = songData.title || existingSong.title;
       existingSong.artist = songData.artist || existingSong.artist;
-      existingSong.album = songData.album || existingSong.album;
+      existingSong.album = songData.album ?? existingSong.album;
       existingSong.sourceLabel = songData.sourceLabel || existingSong.sourceLabel;
       existingSong.extension = songData.extension || existingSong.extension;
       existingSong.initials = songData.initials || existingSong.initials;
       existingSong.artwork = songData.artwork || existingSong.artwork;
       existingSong.artworkDataUrl = songData.artworkDataUrl || existingSong.artworkDataUrl;
       existingSong.artworkMimeType = songData.artworkMimeType || existingSong.artworkMimeType;
-      existingSong.genre = songData.genre || existingSong.genre;
-      existingSong.trackNumber = songData.trackNumber || existingSong.trackNumber;
+      existingSong.genre = songData.genre ?? existingSong.genre;
+      existingSong.trackNumber = songData.trackNumber ?? existingSong.trackNumber;
+      existingSong.youtubeVideoId = songData.youtubeVideoId || existingSong.youtubeVideoId;
+      existingSong.youtubeUrl = songData.youtubeUrl || existingSong.youtubeUrl;
+      existingSong.channelTitle = songData.channelTitle || existingSong.channelTitle;
+      existingSong.publishedAt = songData.publishedAt || existingSong.publishedAt;
 
       if (Number.isFinite(songData.durationSeconds)) {
         existingSong.durationSeconds = songData.durationSeconds;
@@ -176,7 +190,7 @@ class PlaylistManager<TTrack extends Track = Track> {
     };
 
     this.songLibraryById.set(canonicalSong.id, canonicalSong);
-    this.songLibraryByPath.set(canonicalSong.path, canonicalSong);
+    this.songLibraryByKey.set(songKey, canonicalSong);
 
     return canonicalSong;
   }

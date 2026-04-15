@@ -1,4 +1,5 @@
 interface PlaybackControllerEventHandlers {
+  onSeek: (seconds: number) => void;
   onLoadedMetadata: () => void;
   onTimeUpdate: () => void;
   onPlay: () => void;
@@ -28,21 +29,11 @@ class PlaybackController {
 
   bindEvents(handlers: PlaybackControllerEventHandlers): void {
     this.elements.progressSlider.addEventListener('input', () => {
-      if (!Number.isFinite(this.audioElement.duration)) {
-        return;
-      }
-
-      this.audioElement.currentTime = Number(this.elements.progressSlider.value);
-      this.updateProgress();
+      handlers.onSeek(Number(this.elements.progressSlider.value));
     });
 
     this.elements.expandedProgressSlider.addEventListener('input', () => {
-      if (!Number.isFinite(this.audioElement.duration)) {
-        return;
-      }
-
-      this.audioElement.currentTime = Number(this.elements.expandedProgressSlider.value);
-      this.updateProgress();
+      handlers.onSeek(Number(this.elements.expandedProgressSlider.value));
     });
 
     this.elements.volumeSlider.addEventListener('input', () => {
@@ -118,14 +109,38 @@ class PlaybackController {
     this.elements.expandedModeSummary.textContent = modeSummary;
   }
 
-  updateProgress(fallbackDurationSeconds: number | null = null): void {
-    const hasDuration = Number.isFinite(this.audioElement.duration);
-    const duration = hasDuration
-      ? this.audioElement.duration
-      : typeof fallbackDurationSeconds === 'number' && Number.isFinite(fallbackDurationSeconds)
-        ? fallbackDurationSeconds
-        : 0;
-    const currentTime = hasDuration ? this.audioElement.currentTime : 0;
+  updateProgress(
+    {
+      currentTimeSeconds = null,
+      durationSeconds = null,
+      fallbackDurationSeconds = null,
+    }: {
+      currentTimeSeconds?: number | null;
+      durationSeconds?: number | null;
+      fallbackDurationSeconds?: number | null;
+    } = {}
+  ): void {
+    const audioDuration = Number.isFinite(this.audioElement.duration) ? this.audioElement.duration : null;
+    const audioCurrentTime =
+      Number.isFinite(this.audioElement.duration) && Number.isFinite(this.audioElement.currentTime)
+        ? this.audioElement.currentTime
+        : null;
+    const resolvedDuration =
+      typeof durationSeconds === 'number' && Number.isFinite(durationSeconds)
+        ? durationSeconds
+        : typeof audioDuration === 'number'
+          ? audioDuration
+          : typeof fallbackDurationSeconds === 'number' && Number.isFinite(fallbackDurationSeconds)
+            ? fallbackDurationSeconds
+            : 0;
+    const resolvedCurrentTime =
+      typeof currentTimeSeconds === 'number' && Number.isFinite(currentTimeSeconds)
+        ? currentTimeSeconds
+        : typeof audioCurrentTime === 'number'
+          ? audioCurrentTime
+          : 0;
+    const duration = Math.max(resolvedDuration, 0);
+    const currentTime = Math.min(Math.max(resolvedCurrentTime, 0), duration || resolvedCurrentTime);
 
     this.elements.progressSlider.max = String(Math.max(duration, 1));
     this.elements.progressSlider.value = String(currentTime);

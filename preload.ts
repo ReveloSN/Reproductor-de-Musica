@@ -31,11 +31,28 @@ contextBridge.exposeInMainWorld('audioAPI', {
       callback(filePaths);
     });
   },
-  filePathToUrl: (filePath: string): string => pathToFileURL(filePath).href,
+  filePathToUrl: (filePath: string): string => {
+    const origin = globalThis.location?.origin || '';
+
+    if (origin.startsWith('http://') || origin.startsWith('https://')) {
+      return `${origin}/__media__?path=${encodeURIComponent(filePath)}`;
+    }
+
+    return pathToFileURL(filePath).href;
+  },
   basename,
   extname,
   readAudioMetadata: (filePath: string): Promise<AudioFileMetadata> =>
     ipcRenderer.invoke('audio:read-metadata', filePath) as Promise<AudioFileMetadata>,
   fetchLyrics: (query: LyricsLookupQuery): Promise<LyricsResult> =>
     ipcRenderer.invoke('lyrics:lookup', query) as Promise<LyricsResult>,
+});
+
+contextBridge.exposeInMainWorld('youtubeAPI', {
+  getConfig: (): Promise<YouTubeConfig> =>
+    ipcRenderer.invoke('youtube:get-config') as Promise<YouTubeConfig>,
+  searchVideos: (query: string): Promise<YouTubeSearchResponse> =>
+    ipcRenderer.invoke('youtube:search', query) as Promise<YouTubeSearchResponse>,
+  openVideo: (url: string): Promise<boolean> =>
+    ipcRenderer.invoke('youtube:open-external', url) as Promise<boolean>,
 });

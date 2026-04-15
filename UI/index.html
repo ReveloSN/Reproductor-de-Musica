@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self'" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; connect-src 'self' https://www.googleapis.com https://www.youtube.com https://www.youtube-nocookie.com; img-src 'self' data: file: https://i.ytimg.com https://yt3.ggpht.com; style-src 'self' 'unsafe-inline'; frame-src https://www.youtube.com https://www.youtube-nocookie.com; media-src 'self' file: blob: data:"
+    />
     <title>Local Audio Player</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -36,6 +39,13 @@
             <div>
               <strong>Playlist principal</strong>
               <span>Lista doble activa</span>
+            </div>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">03</span>
+            <div>
+              <strong>YouTube</strong>
+              <span>Busqueda oficial y playback embebido</span>
             </div>
           </div>
         </nav>
@@ -138,7 +148,7 @@
               <input
                 id="searchInput"
                 type="search"
-                placeholder="Buscar por titulo, artista, album, archivo o ruta"
+                placeholder="Buscar por titulo, artista, album, archivo, ruta o canal"
                 autocomplete="off"
               />
             </label>
@@ -184,6 +194,74 @@
               <span id="playbackStatus" class="status-pill">En espera</span>
               <span id="shuffleStateLabel" class="mode-pill">Shuffle off</span>
               <span id="repeatStateLabel" class="mode-pill">Repeat off</span>
+            </div>
+          </section>
+
+          <section class="youtube-panel">
+            <div class="youtube-panel-header">
+              <div>
+                <p class="eyebrow">YouTube</p>
+                <h3>Modulo YouTube</h3>
+                <p id="youtubeApiStatus" class="youtube-api-status">
+                  Configura YOUTUBE_API_KEY para habilitar la busqueda oficial.
+                </p>
+              </div>
+
+              <label class="youtube-target-field" for="youtubePlaylistTarget">
+                <span>Agregar a playlist</span>
+                <select id="youtubePlaylistTarget"></select>
+              </label>
+            </div>
+
+            <div class="youtube-search-row">
+              <label class="search-field youtube-search-field" for="youtubeSearchInput">
+                <span class="search-icon">&#8981;</span>
+                <input
+                  id="youtubeSearchInput"
+                  type="search"
+                  placeholder="Buscar videos musicales oficiales en YouTube"
+                  autocomplete="off"
+                />
+              </label>
+              <button id="youtubeSearchButton" class="button button-primary" type="button">
+                Buscar
+              </button>
+            </div>
+
+            <p id="youtubeSearchStatus" class="youtube-search-status">
+              Busca videos musicales oficiales, intenta reproducirlos en la app o abre el resultado en YouTube.
+            </p>
+
+            <div class="youtube-grid">
+              <article class="youtube-player-card">
+                <div class="youtube-player-card-header">
+                  <div>
+                    <p class="eyebrow">Player hibrido</p>
+                    <h4 id="youtubePlayerTitle">Player de YouTube</h4>
+                  </div>
+                  <p id="youtubePlayerMeta" class="youtube-player-meta">
+                    Intenta reproducir en la app. Si falla, usa el boton para abrir el mismo resultado en YouTube.
+                  </p>
+                </div>
+
+                <div id="youtubePlayerSurface" class="youtube-player-surface" data-state="idle">
+                  <div id="youtubePlayerTarget" class="youtube-player-target"></div>
+                </div>
+
+                <p id="youtubePlayerStatus" class="youtube-player-status">
+                  Selecciona un video de YouTube para reproducirlo aqui.
+                </p>
+                <button
+                  id="youtubeOpenFallbackButton"
+                  class="button button-secondary youtube-open-fallback-button"
+                  type="button"
+                  hidden
+                >
+                  Abrir este track en YouTube
+                </button>
+              </article>
+
+              <div id="youtubeResults" class="youtube-results" aria-live="polite"></div>
             </div>
           </section>
 
@@ -405,6 +483,8 @@
     <script src="playback-controller.js"></script>
     <script src="playlist-view.js"></script>
     <script src="now-playing-view.js"></script>
+    <script src="youtube-search-view.js"></script>
+    <script src="youtube-player-view.js"></script>
     <script src="song-factory.js"></script>
     <script src="playlist-actions.js"></script>
     <script src="script.js"></script>

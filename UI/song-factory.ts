@@ -70,6 +70,7 @@ class SongFactory {
 
     return {
       id: `song-${Date.now()}-${this.songIdCounter++}`,
+      source: 'local',
       name: fileName,
       fileName,
       title,
@@ -88,6 +89,48 @@ class SongFactory {
       genre: this.sanitizeOptionalText(metadata.genre),
       trackNumber: metadata.trackNumber,
       sourceLabel: 'Archivo local',
+      youtubeVideoId: null,
+      youtubeUrl: null,
+      channelTitle: null,
+      publishedAt: null,
+      isFavorite: false,
+    };
+  }
+
+  createYouTubeTrack(video: YouTubeVideoSummary): Track {
+    const title = this.sanitizeOptionalText(video.title) || 'Video sin titulo';
+    const artist = this.sanitizeOptionalText(video.channelTitle) || 'Canal desconocido';
+    const artwork = this.createArtworkPalette(`${artist}-${title}-${video.videoId}`);
+    const durationSeconds =
+      typeof video.durationSeconds === 'number' && Number.isFinite(video.durationSeconds)
+        ? video.durationSeconds
+        : null;
+
+    return {
+      id: `youtube-${video.videoId}`,
+      source: 'youtube',
+      name: title,
+      fileName: title,
+      title,
+      artist,
+      album: null,
+      path: video.youtubeUrl,
+      filePath: '',
+      url: video.youtubeUrl,
+      extension: 'YT',
+      durationSeconds,
+      durationText: durationSeconds ? this.formatDuration(durationSeconds) : '--:--',
+      artwork,
+      artworkDataUrl: video.thumbnailUrl,
+      artworkMimeType: null,
+      initials: this.getInitials(title),
+      genre: null,
+      trackNumber: null,
+      sourceLabel: 'YouTube',
+      youtubeVideoId: video.videoId,
+      youtubeUrl: video.youtubeUrl,
+      channelTitle: artist,
+      publishedAt: video.publishedAt,
       isFavorite: false,
     };
   }
