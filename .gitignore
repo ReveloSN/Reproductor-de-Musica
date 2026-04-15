@@ -2,3 +2,8 @@ node_modules
 .history
 /release
 /dist
+/main.js
+/menu.js
+/preload.js
+/UI/*.js
+/UI/*.js.map

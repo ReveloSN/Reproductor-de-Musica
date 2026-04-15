@@ -1,9 +1,11 @@
 class LyricsService {
+  lyricsLibrary: Map<string, string>;
+
   constructor() {
     this.lyricsLibrary = new Map();
   }
 
-  normalizeText(value) {
+  normalizeText(value: string): string {
     return String(value || '')
       .toLowerCase()
       .normalize('NFD')
@@ -13,7 +15,7 @@ class LyricsService {
       .replace(/\s+/g, ' ');
   }
 
-  buildLookupKeys(song) {
+  buildLookupKeys(song: Track | null): string[] {
     if (!song) {
       return [];
     }
@@ -27,7 +29,7 @@ class LyricsService {
     return Array.from(new Set(keys));
   }
 
-  async getLyrics(song) {
+  async getLyrics(song: Track | null): Promise<LyricsResult> {
     if (!song) {
       return {
         status: 'empty',
@@ -42,7 +44,7 @@ class LyricsService {
       if (this.lyricsLibrary.has(lookupKey)) {
         return {
           status: 'available',
-          lyrics: this.lyricsLibrary.get(lookupKey),
+          lyrics: this.lyricsLibrary.get(lookupKey) || '',
           message: '',
           lookupKey,
         };

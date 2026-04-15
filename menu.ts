@@ -1,6 +1,6 @@
-const { dialog } = require('electron');
+import { dialog, type BrowserWindow, type FileFilter, type MenuItemConstructorOptions } from 'electron';
 
-function buildMenu(mainWindow, audioFilters) {
+function buildMenu(mainWindow: BrowserWindow, audioFilters: FileFilter[]): MenuItemConstructorOptions[] {
   return [
     {
       label: 'Archivo',
@@ -29,7 +29,7 @@ function buildMenu(mainWindow, audioFilters) {
         {
           label: 'Acerca de',
           click: () => {
-            dialog.showMessageBox(mainWindow, {
+            void dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'Acerca de',
               message: 'Local Audio Player',
@@ -45,4 +45,4 @@ function buildMenu(mainWindow, audioFilters) {
   ];
 }
 
-module.exports = buildMenu;
+export default buildMenu;

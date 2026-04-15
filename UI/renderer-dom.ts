@@ -1,0 +1,87 @@
+function requireElement<TElement extends HTMLElement>(
+  documentRef: Document,
+  id: string
+): TElement {
+  const element = documentRef.getElementById(id);
+
+  if (!element) {
+    throw new Error(`Missing required renderer element: #${id}`);
+  }
+
+  return element as TElement;
+}
+
+function createRendererElements(documentRef: Document): RendererElements {
+  return {
+    addEndButton: requireElement<HTMLButtonElement>(documentRef, 'addEndButton'),
+    addStartButton: requireElement<HTMLButtonElement>(documentRef, 'addStartButton'),
+    insertPosition: requireElement<HTMLInputElement>(documentRef, 'insertPosition'),
+    insertAtPositionButton: requireElement<HTMLButtonElement>(documentRef, 'insertAtPositionButton'),
+    feedbackMessage: requireElement<HTMLParagraphElement>(documentRef, 'feedbackMessage'),
+    newPlaylistName: requireElement<HTMLInputElement>(documentRef, 'newPlaylistName'),
+    createPlaylistButton: requireElement<HTMLButtonElement>(documentRef, 'createPlaylistButton'),
+    playlistHelperText: requireElement<HTMLParagraphElement>(documentRef, 'playlistHelperText'),
+    playlistList: requireElement<HTMLDivElement>(documentRef, 'playlistList'),
+    searchInput: requireElement<HTMLInputElement>(documentRef, 'searchInput'),
+    playlistSummaryChip: requireElement<HTMLSpanElement>(documentRef, 'playlistSummaryChip'),
+    modeSummaryChip: requireElement<HTMLSpanElement>(documentRef, 'modeSummaryChip'),
+    playlistSummary: requireElement<HTMLSpanElement>(documentRef, 'playlistSummary'),
+    playlistDurationLabel: requireElement<HTMLSpanElement>(documentRef, 'playlistDurationLabel'),
+    currentPositionLabel: requireElement<HTMLSpanElement>(documentRef, 'currentPositionLabel'),
+    activePlaylistTitle: requireElement<HTMLHeadingElement>(documentRef, 'activePlaylistTitle'),
+    activePlaylistDescription: requireElement<HTMLParagraphElement>(documentRef, 'activePlaylistDescription'),
+    playlistPanelTitle: requireElement<HTMLHeadingElement>(documentRef, 'playlistPanelTitle'),
+    playlistResultsLabel: requireElement<HTMLParagraphElement>(documentRef, 'playlistResultsLabel'),
+    currentSongTitle: requireElement<HTMLHeadingElement>(documentRef, 'currentSongTitle'),
+    currentSongMeta: requireElement<HTMLParagraphElement>(documentRef, 'currentSongMeta'),
+    playbackStatus: requireElement<HTMLSpanElement>(documentRef, 'playbackStatus'),
+    shuffleStateLabel: requireElement<HTMLSpanElement>(documentRef, 'shuffleStateLabel'),
+    repeatStateLabel: requireElement<HTMLSpanElement>(documentRef, 'repeatStateLabel'),
+    playlist: requireElement<HTMLUListElement>(documentRef, 'playlist'),
+    heroArtwork: requireElement<HTMLDivElement>(documentRef, 'heroArtwork'),
+    heroArtworkInitials: requireElement<HTMLSpanElement>(documentRef, 'heroArtworkInitials'),
+    playerTrackTrigger: requireElement<HTMLDivElement>(documentRef, 'playerTrackTrigger'),
+    playerArtwork: requireElement<HTMLDivElement>(documentRef, 'playerArtwork'),
+    playerArtworkInitials: requireElement<HTMLSpanElement>(documentRef, 'playerArtworkInitials'),
+    playerSongTitle: requireElement<HTMLHeadingElement>(documentRef, 'playerSongTitle'),
+    playerSongMeta: requireElement<HTMLParagraphElement>(documentRef, 'playerSongMeta'),
+    audioElement: requireElement<HTMLAudioElement>(documentRef, 'audioElement'),
+    shuffleButton: requireElement<HTMLButtonElement>(documentRef, 'shuffleButton'),
+    previousButton: requireElement<HTMLButtonElement>(documentRef, 'previousButton'),
+    playButton: requireElement<HTMLButtonElement>(documentRef, 'playButton'),
+    playPauseGlyph: requireElement<HTMLSpanElement>(documentRef, 'playPauseGlyph'),
+    nextButton: requireElement<HTMLButtonElement>(documentRef, 'nextButton'),
+    repeatButton: requireElement<HTMLButtonElement>(documentRef, 'repeatButton'),
+    repeatIndicator: requireElement<HTMLSpanElement>(documentRef, 'repeatIndicator'),
+    stopButton: requireElement<HTMLButtonElement>(documentRef, 'stopButton'),
+    progressSlider: requireElement<HTMLInputElement>(documentRef, 'progressSlider'),
+    currentTimeLabel: requireElement<HTMLSpanElement>(documentRef, 'currentTimeLabel'),
+    durationLabel: requireElement<HTMLSpanElement>(documentRef, 'durationLabel'),
+    volumeSlider: requireElement<HTMLInputElement>(documentRef, 'volumeSlider'),
+    nowPlayingOverlay: requireElement<HTMLElement>(documentRef, 'nowPlayingOverlay'),
+    closeNowPlayingButton: requireElement<HTMLButtonElement>(documentRef, 'closeNowPlayingButton'),
+    expandedArtwork: requireElement<HTMLDivElement>(documentRef, 'expandedArtwork'),
+    expandedArtworkInitials: requireElement<HTMLSpanElement>(documentRef, 'expandedArtworkInitials'),
+    expandedSongTitle: requireElement<HTMLHeadingElement>(documentRef, 'expandedSongTitle'),
+    expandedSongMeta: requireElement<HTMLParagraphElement>(documentRef, 'expandedSongMeta'),
+    expandedSongContext: requireElement<HTMLParagraphElement>(documentRef, 'expandedSongContext'),
+    expandedPlaybackStatus: requireElement<HTMLSpanElement>(documentRef, 'expandedPlaybackStatus'),
+    expandedModeSummary: requireElement<HTMLSpanElement>(documentRef, 'expandedModeSummary'),
+    expandedShuffleButton: requireElement<HTMLButtonElement>(documentRef, 'expandedShuffleButton'),
+    expandedPreviousButton: requireElement<HTMLButtonElement>(documentRef, 'expandedPreviousButton'),
+    expandedPlayButton: requireElement<HTMLButtonElement>(documentRef, 'expandedPlayButton'),
+    expandedPlayPauseGlyph: requireElement<HTMLSpanElement>(documentRef, 'expandedPlayPauseGlyph'),
+    expandedNextButton: requireElement<HTMLButtonElement>(documentRef, 'expandedNextButton'),
+    expandedRepeatButton: requireElement<HTMLButtonElement>(documentRef, 'expandedRepeatButton'),
+    expandedRepeatIndicator: requireElement<HTMLSpanElement>(documentRef, 'expandedRepeatIndicator'),
+    expandedProgressSlider: requireElement<HTMLInputElement>(documentRef, 'expandedProgressSlider'),
+    expandedCurrentTimeLabel: requireElement<HTMLSpanElement>(documentRef, 'expandedCurrentTimeLabel'),
+    expandedDurationLabel: requireElement<HTMLSpanElement>(documentRef, 'expandedDurationLabel'),
+    lyricsOriginalStatus: requireElement<HTMLParagraphElement>(documentRef, 'lyricsOriginalStatus'),
+    lyricsOriginalContent: requireElement<HTMLDivElement>(documentRef, 'lyricsOriginalContent'),
+    lyricsTranslatedStatus: requireElement<HTMLParagraphElement>(documentRef, 'lyricsTranslatedStatus'),
+    lyricsTranslatedContent: requireElement<HTMLDivElement>(documentRef, 'lyricsTranslatedContent'),
+  };
+}
+
+window.createRendererElements = createRendererElements;

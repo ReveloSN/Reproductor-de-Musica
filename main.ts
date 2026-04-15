@@ -1,14 +1,14 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
-const path = require('node:path');
-const buildMenu = require('./menu');
+import { app, BrowserWindow, Menu, dialog, ipcMain, type FileFilter } from 'electron';
+import path from 'node:path';
+import buildMenu from './menu';
 
 const isDev = process.env.NODE_ENV === 'development';
-const AUDIO_FILE_FILTERS = [
+const AUDIO_FILE_FILTERS: FileFilter[] = [
   { name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'm4a'] },
 ];
 
-function createWindow() {
-  const win = new BrowserWindow({
+function createWindow(): BrowserWindow {
+  const mainWindow = new BrowserWindow({
     title: 'Local Audio Player',
     width: 1180,
     height: 760,
@@ -23,18 +23,18 @@ function createWindow() {
   });
 
   if (isDev) {
-    win.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
-  win.loadFile(path.join(__dirname, 'UI', 'index.html'));
+  void mainWindow.loadFile(path.join(__dirname, 'UI', 'index.html'));
 
-  const mainMenu = Menu.buildFromTemplate(buildMenu(win, AUDIO_FILE_FILTERS));
+  const mainMenu = Menu.buildFromTemplate(buildMenu(mainWindow, AUDIO_FILE_FILTERS));
   Menu.setApplicationMenu(mainMenu);
 
-  return win;
+  return mainWindow;
 }
 
-ipcMain.handle('dialog:open-audio-files', async () => {
+ipcMain.handle('dialog:open-audio-files', async (): Promise<string[]> => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
     filters: AUDIO_FILE_FILTERS,
@@ -43,7 +43,7 @@ ipcMain.handle('dialog:open-audio-files', async () => {
   return result.canceled ? [] : result.filePaths;
 });
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {

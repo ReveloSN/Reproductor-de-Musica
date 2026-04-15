@@ -1,5 +1,29 @@
-class PlaylistManager {
-  constructor(PlaylistClass) {
+interface CreatePlaylistOptions {
+  id?: string;
+  system?: boolean;
+  favorites?: boolean;
+}
+
+interface CreatePlaylistResult<TTrack extends Track = Track> {
+  ok: boolean;
+  playlist?: PlaylistRecord<TTrack>;
+  error?: string;
+}
+
+interface AddSongsResult<TTrack extends Track = Track> {
+  added: TTrack[];
+  duplicates: TTrack[];
+}
+
+class PlaylistManager<TTrack extends Track = Track> {
+  PlaylistClass: new () => DoublyLinkedPlaylist<TTrack>;
+  playlists: Map<string, PlaylistRecord<TTrack>>;
+  playlistOrder: string[];
+  songLibraryById: Map<string, TTrack>;
+  songLibraryByPath: Map<string, TTrack>;
+  activePlaylistId: string | null;
+
+  constructor(PlaylistClass: new () => DoublyLinkedPlaylist<TTrack>) {
     this.PlaylistClass = PlaylistClass;
     this.playlists = new Map();
     this.playlistOrder = [];
@@ -19,13 +43,13 @@ class PlaylistManager {
     this.setActivePlaylist('main');
   }
 
-  normalizeName(name) {
+  normalizeName(name: string): string {
     return String(name || '')
       .trim()
       .replace(/\s+/g, ' ');
   }
 
-  generatePlaylistId(name) {
+  generatePlaylistId(name: string): string {
     const normalized = this.normalizeName(name)
       .toLowerCase()
       .normalize('NFD')
@@ -45,13 +69,13 @@ class PlaylistManager {
     return nextId;
   }
 
-  nameExists(name) {
+  nameExists(name: string): boolean {
     const normalized = this.normalizeName(name).toLowerCase();
 
     return this.getPlaylists().some((playlist) => playlist.name.toLowerCase() === normalized);
   }
 
-  createPlaylist(name, options = {}) {
+  createPlaylist(name: string, options: CreatePlaylistOptions = {}): CreatePlaylistResult<TTrack> {
     const normalizedName = this.normalizeName(name);
 
     if (!normalizedName) {
@@ -69,7 +93,7 @@ class PlaylistManager {
     }
 
     const playlistId = options.id || this.generatePlaylistId(normalizedName);
-    const playlistRecord = {
+    const playlistRecord: PlaylistRecord<TTrack> = {
       id: playlistId,
       name: normalizedName,
       list: new this.PlaylistClass(),
@@ -86,25 +110,25 @@ class PlaylistManager {
     };
   }
 
-  getPlaylists() {
+  getPlaylists(): PlaylistRecord<TTrack>[] {
     return this.playlistOrder
-      .map((playlistId) => this.playlists.get(playlistId))
-      .filter((playlist) => Boolean(playlist));
+      .map((playlistId) => this.playlists.get(playlistId) || null)
+      .filter((playlist): playlist is PlaylistRecord<TTrack> => Boolean(playlist));
   }
 
-  getPlaylist(playlistId) {
+  getPlaylist(playlistId: string): PlaylistRecord<TTrack> | null {
     return this.playlists.get(playlistId) || null;
   }
 
-  getFavoritesPlaylist() {
+  getFavoritesPlaylist(): PlaylistRecord<TTrack> | null {
     return this.getPlaylist('favorites');
   }
 
-  getActivePlaylist() {
-    return this.getPlaylist(this.activePlaylistId);
+  getActivePlaylist(): PlaylistRecord<TTrack> | null {
+    return this.activePlaylistId ? this.getPlaylist(this.activePlaylistId) : null;
   }
 
-  setActivePlaylist(playlistId) {
+  setActivePlaylist(playlistId: string): boolean {
     if (!this.playlists.has(playlistId)) {
       return false;
     }
@@ -113,11 +137,11 @@ class PlaylistManager {
     return true;
   }
 
-  getSongById(songId) {
+  getSongById(songId: string): TTrack | null {
     return this.songLibraryById.get(songId) || null;
   }
 
-  getOrCreateSong(songData) {
+  getOrCreateSong(songData: TTrack): TTrack {
     const existingSong = this.songLibraryByPath.get(songData.path);
 
     if (existingSong) {
@@ -135,7 +159,7 @@ class PlaylistManager {
     return canonicalSong;
   }
 
-  findSongIndex(playlistId, songId) {
+  findSongIndex(playlistId: string, songId: string): number {
     const playlist = this.getPlaylist(playlistId);
 
     if (!playlist) {
@@ -145,11 +169,11 @@ class PlaylistManager {
     return playlist.list.toArray().findIndex((song) => song.id === songId);
   }
 
-  hasSong(playlistId, songId) {
+  hasSong(playlistId: string, songId: string): boolean {
     return this.findSongIndex(playlistId, songId) !== -1;
   }
 
-  addSongToPlaylist(playlistId, song, position = null) {
+  addSongToPlaylist(playlistId: string, song: TTrack | null, position: number | null = null): boolean {
     const playlist = this.getPlaylist(playlistId);
 
     if (!playlist || !song || this.hasSong(playlistId, song.id)) {
@@ -170,9 +194,13 @@ class PlaylistManager {
     return true;
   }
 
-  addSongsToPlaylist(playlistId, songs, { mode = 'end', position = null } = {}) {
-    const added = [];
-    const duplicates = [];
+  addSongsToPlaylist(
+    playlistId: string,
+    songs: TTrack[],
+    { mode = 'end', position = null }: { mode?: 'start' | 'end' | 'position'; position?: number | null } = {}
+  ): AddSongsResult<TTrack> {
+    const added: TTrack[] = [];
+    const duplicates: TTrack[] = [];
 
     if (mode === 'start') {
       for (let index = songs.length - 1; index >= 0; index -= 1) {
@@ -189,7 +217,7 @@ class PlaylistManager {
     }
 
     if (mode === 'position') {
-      let nextPosition = Number.isInteger(position) ? position : 0;
+      let nextPosition = Number.isInteger(position) ? (position as number) : 0;
 
       songs.forEach((song) => {
         if (this.addSongToPlaylist(playlistId, song, nextPosition)) {
@@ -214,7 +242,7 @@ class PlaylistManager {
     return { added, duplicates };
   }
 
-  removeSongFromPlaylist(playlistId, songId) {
+  removeSongFromPlaylist(playlistId: string, songId: string): TTrack | null {
     const playlist = this.getPlaylist(playlistId);
     const songIndex = this.findSongIndex(playlistId, songId);
 
@@ -225,7 +253,7 @@ class PlaylistManager {
     return playlist.list.removeAt(songIndex);
   }
 
-  setCurrentSongById(playlistId, songId) {
+  setCurrentSongById(playlistId: string, songId: string): TTrack | null {
     const playlist = this.getPlaylist(playlistId);
     const songIndex = this.findSongIndex(playlistId, songId);
 
@@ -236,7 +264,7 @@ class PlaylistManager {
     return playlist.list.setCurrentByPosition(songIndex);
   }
 
-  toggleFavorite(songId) {
+  toggleFavorite(songId: string): TTrack | null {
     const song = this.getSongById(songId);
 
     if (!song) {
@@ -248,7 +276,7 @@ class PlaylistManager {
     return song;
   }
 
-  setFavorite(songId, value) {
+  setFavorite(songId: string, value: boolean): TTrack | null {
     const song = this.getSongById(songId);
 
     if (!song) {
@@ -260,7 +288,7 @@ class PlaylistManager {
     return song;
   }
 
-  syncFavoritesMembership(song) {
+  syncFavoritesMembership(song: TTrack): void {
     const favoritesPlaylist = this.getFavoritesPlaylist();
 
     if (!favoritesPlaylist) {

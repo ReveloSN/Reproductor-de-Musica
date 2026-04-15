@@ -1,177 +1,76 @@
-# 🎵 Electron Music Player
+# Reproductor de Musica
 
-A cross-platform desktop music player built with **Electron**, **React**, **Vite**, and **TypeScript**. This app allows users to select and play local music files from a clean, lightweight desktop interface.
+Aplicacion de escritorio con Electron para reproducir archivos de audio locales.
 
----
+La app usa:
 
-## 📦 Features
+- Electron para la ventana de escritorio
+- TypeScript para el proceso principal, preload y la UI
+- HTML y CSS en `UI/`
+- salida compilada en `dist/`
 
-- 🎧 Play local music files
-- ⚡ Fast development with Vite + React
-- 🖥️ Desktop packaging via electron-builder
-- 🧩 Fully typed with TypeScript
-- 🧱 Easy to customize UI and features
-- 🪟 Windows production-ready build
+## Estructura actual
 
----
-
-## 📁 Project Structure
-
-```
-electron-music-player/
-├── assets/                       # App assets (icons, etc.)
-│   └── icon.ico
-├── dist/                         # Vite build output
-├── electron-musuic-player/
-│   ├── main.ts                   # Electron main process
-│   ├── preload.ts                # Optional preload script
-│   ├── App.tsx                   # React app entry
-│   └── index.html                # Root HTML
-├── release/                      # Final packaged app
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── README.md
-```
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone and Install
-
-```bash
-cd electron-music-player
-npm install
+```text
+Reproductor-de-Musica/
+|-- UI/
+|   |-- index.html
+|   |-- styles.css
+|   |-- script.ts
+|   |-- playlist-actions.ts
+|   |-- playlist-manager.ts
+|   |-- playback-controller.ts
+|   |-- now-playing-view.ts
+|   |-- playlist-view.ts
+|   |-- song-factory.ts
+|   |-- doubly-linked-playlist.ts
+|   |-- lyrics-service.ts
+|   |-- translation-service.ts
+|   |-- renderer-dom.ts
+|   `-- renderer-dom-types.ts
+|-- scripts/
+|   |-- clean-dist.cjs
+|   `-- copy-ui-static.cjs
+|-- dist/
+|-- main.ts
+|-- preload.ts
+|-- menu.ts
+|-- global.d.ts
+|-- package.json
+`-- tsconfig.json
 ```
 
-### 2. Development Preview in Browser
+## Como ejecutar
 
-```bash
-npm start
+En Windows PowerShell:
+
+```powershell
+cd "C:\Users\nikol\Documents\universidad\semestre 4\app reproductor de musica\Reproductor-de-Musica"
+npm.cmd run start
 ```
 
-### 3. Run Electron with auto reload on file changes
+El comando hace esto:
 
-```bash
-npx electronmon .
+1. Limpia `dist/`
+2. Compila TypeScript a `dist/`
+3. Copia `UI/index.html` y `UI/styles.css` a `dist/UI`
+4. Abre Electron usando `dist/main.js`
+
+## Scripts disponibles
+
+```powershell
+npm.cmd run start
+npm.cmd run build:ts
+npm.cmd run typecheck
 ```
 
-This runs Electron and loads the built React frontend from Vite.
+## Flujo de compilacion
 
----
+- `main.ts`, `menu.ts`, `preload.ts` y `UI/**/*.ts` se compilan a `dist/`
+- los archivos estaticos de `UI/` se copian a `dist/UI`
+- los `.js` generados ya no viven mezclados con los `.ts` del codigo fuente
 
-## 🏗️ Build for Production
+## Notas
 
-### Full Build & Package
-
-```bash
-npm run dist
-```
-
-This will:
-- Compile TypeScript: `tsc`
-- Build the Vite frontend for production
-- Package the app with `electron-builder`
-
-The built `.exe` and supporting files will be in the `/release` folder.
-
----
-
-## 🧰 Fixes & Configuration
-
-### ✅ Fix Asset Paths in Production
-
-Ensure you have this in `vite.config.ts`:
-
-```ts
-export default defineConfig({
-  base: './',
-  plugins: [react()],
-});
-```
-
-### ✅ Fix Electron Loading Local HTML
-
-In your `main.ts`, load the built file correctly:
-
-```ts
-mainWindow.loadFile(path.join(__dirname, 'index.html'));
-```
-
-If you see a blank window or missing `.js` files, make sure your `index.html` references assets like this:
-
-```html
-<script type="module" src="./assets/index-xxxxx.js"></script>
-```
-
----
-
-## 🎨 Customize Your Icon
-
-1. Create a 256x256 `.ico` file (you can use [favicon.io](https://favicon.io) or GIMP/Photoshop).
-2. Place it in the `assets/` folder.
-3. Update your `package.json` under `build`:
-
-```json
-"build": {
-  "icon": "assets/icon.ico"
-}
-```
-
-This icon will appear in the `.exe` after build.
-
----
-
-## 🛠️ package.json Example
-
-```json
-{
-  "name": "electron-music-player",
-  "version": "1.0.0",
-  "description": "Music player",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "John Doe",
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "23.1.3"
-  }
-}
-```
-
----
-
-## 💡 Ideas for Further Customization
-
-- Add a music playlist system
-- Show waveform visualizations
-- Dark/light mode toggle
-- Drag-and-drop music files
-- Persist state using local storage or a lightweight DB like `lowdb`
-- Show cover art from music metadata
-- Global keyboard shortcuts (play/pause/next)
-- Add support for `.m3u` playlists
-
----
-
-## 🧽 Clean Build Cache
-
-If you ever need a clean rebuild:
-
-```bash
-rm -rf dist release
-npm install
-npm run dist
-```
-
----
-
-## 🧾 License
-
-MIT — feel free to modify and share!
+- La carpeta `renderer/` fue retirada del flujo principal porque no se usaba en la version final de la app.
+- Si PowerShell bloquea `npm`, usa `npm.cmd`.

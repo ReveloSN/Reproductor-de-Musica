@@ -1,9 +1,11 @@
 class TranslationService {
+  translationLibrary: Map<string, string>;
+
   constructor() {
     this.translationLibrary = new Map();
   }
 
-  normalizeText(value) {
+  normalizeText(value: string): string {
     return String(value || '')
       .toLowerCase()
       .normalize('NFD')
@@ -13,7 +15,7 @@ class TranslationService {
       .replace(/\s+/g, ' ');
   }
 
-  buildLookupKeys(song) {
+  buildLookupKeys(song: Track | null): string[] {
     if (!song) {
       return [];
     }
@@ -27,7 +29,7 @@ class TranslationService {
     return Array.from(new Set(keys));
   }
 
-  async getTranslation(song, lyricsResult) {
+  async getTranslation(song: Track | null, lyricsResult: LyricsResult): Promise<TranslationResult> {
     if (!song) {
       return {
         status: 'empty',
@@ -50,7 +52,7 @@ class TranslationService {
       if (this.translationLibrary.has(lookupKey)) {
         return {
           status: 'available',
-          translation: this.translationLibrary.get(lookupKey),
+          translation: this.translationLibrary.get(lookupKey) || '',
           message: '',
           lookupKey,
         };

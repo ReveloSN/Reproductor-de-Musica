@@ -1,12 +1,21 @@
-class PlaylistNode {
-  constructor(song) {
+class PlaylistNode<TTrack extends Track = Track> {
+  song: TTrack;
+  prev: PlaylistNode<TTrack> | null;
+  next: PlaylistNode<TTrack> | null;
+
+  constructor(song: TTrack) {
     this.song = song;
     this.prev = null;
     this.next = null;
   }
 }
 
-class DoublyLinkedPlaylist {
+class DoublyLinkedPlaylist<TTrack extends Track = Track> {
+  head: PlaylistNode<TTrack> | null;
+  tail: PlaylistNode<TTrack> | null;
+  current: PlaylistNode<TTrack> | null;
+  length: number;
+
   constructor() {
     this.head = null;
     this.tail = null;
@@ -14,11 +23,11 @@ class DoublyLinkedPlaylist {
     this.length = 0;
   }
 
-  isEmpty() {
+  isEmpty(): boolean {
     return this.length === 0;
   }
 
-  addFirst(song) {
+  addFirst(song: TTrack): number {
     const node = new PlaylistNode(song);
 
     if (this.isEmpty()) {
@@ -27,7 +36,11 @@ class DoublyLinkedPlaylist {
       this.current = node;
     } else {
       node.next = this.head;
-      this.head.prev = node;
+
+      if (this.head) {
+        this.head.prev = node;
+      }
+
       this.head = node;
     }
 
@@ -35,7 +48,7 @@ class DoublyLinkedPlaylist {
     return 0;
   }
 
-  addLast(song) {
+  addLast(song: TTrack): number {
     const node = new PlaylistNode(song);
 
     if (this.isEmpty()) {
@@ -44,7 +57,11 @@ class DoublyLinkedPlaylist {
       this.current = node;
     } else {
       node.prev = this.tail;
-      this.tail.next = node;
+
+      if (this.tail) {
+        this.tail.next = node;
+      }
+
       this.tail = node;
     }
 
@@ -52,11 +69,11 @@ class DoublyLinkedPlaylist {
     return this.length - 1;
   }
 
-  addAt(song, position) {
+  addAt(song: TTrack, position: number): number {
     return this.insertAt(song, position);
   }
 
-  insertAt(song, position) {
+  insertAt(song: TTrack, position: number): number {
     if (position < 0 || position > this.length) {
       throw new RangeError('Invalid insert position.');
     }
@@ -70,6 +87,11 @@ class DoublyLinkedPlaylist {
     }
 
     const nextNode = this.getNodeAt(position);
+
+    if (!nextNode || !nextNode.prev) {
+      throw new RangeError('Invalid insert position.');
+    }
+
     const prevNode = nextNode.prev;
     const node = new PlaylistNode(song);
 
@@ -82,12 +104,16 @@ class DoublyLinkedPlaylist {
     return position;
   }
 
-  removeAt(position) {
+  removeAt(position: number): TTrack {
     if (position < 0 || position >= this.length) {
       throw new RangeError('Invalid remove position.');
     }
 
     const node = this.getNodeAt(position);
+
+    if (!node) {
+      throw new RangeError('Invalid remove position.');
+    }
 
     if (node.prev) {
       node.prev.next = node.next;
@@ -119,14 +145,14 @@ class DoublyLinkedPlaylist {
     return node.song;
   }
 
-  next() {
+  next(): TTrack | null {
     if (this.isEmpty()) {
       return null;
     }
 
     if (!this.current) {
       this.current = this.head;
-      return this.current.song;
+      return this.current ? this.current.song : null;
     }
 
     if (!this.current.next) {
@@ -137,18 +163,18 @@ class DoublyLinkedPlaylist {
     return this.current.song;
   }
 
-  nextSong() {
+  nextSong(): TTrack | null {
     return this.next();
   }
 
-  previous() {
+  previous(): TTrack | null {
     if (this.isEmpty()) {
       return null;
     }
 
     if (!this.current) {
       this.current = this.head;
-      return this.current.song;
+      return this.current ? this.current.song : null;
     }
 
     if (!this.current.prev) {
@@ -159,11 +185,11 @@ class DoublyLinkedPlaylist {
     return this.current.song;
   }
 
-  prevSong() {
+  prevSong(): TTrack | null {
     return this.previous();
   }
 
-  setCurrentByPosition(position) {
+  setCurrentByPosition(position: number): TTrack | null {
     const node = this.getNodeAt(position);
 
     if (!node) {
@@ -174,20 +200,20 @@ class DoublyLinkedPlaylist {
     return node.song;
   }
 
-  getCurrent() {
+  getCurrent(): TTrack | null {
     return this.current ? this.current.song : null;
   }
 
-  getCurrentSong() {
+  getCurrentSong(): TTrack | null {
     return this.getCurrent();
   }
 
-  getAt(position) {
+  getAt(position: number): TTrack | null {
     const node = this.getNodeAt(position);
     return node ? node.song : null;
   }
 
-  getCurrentIndex() {
+  getCurrentIndex(): number {
     let index = 0;
     let node = this.head;
 
@@ -203,32 +229,32 @@ class DoublyLinkedPlaylist {
     return -1;
   }
 
-  getNodeAt(position) {
+  getNodeAt(position: number): PlaylistNode<TTrack> | null {
     if (position < 0 || position >= this.length) {
       return null;
     }
 
-    let currentNode;
+    let currentNode: PlaylistNode<TTrack> | null;
 
     if (position <= Math.floor(this.length / 2)) {
       currentNode = this.head;
 
       for (let index = 0; index < position; index += 1) {
-        currentNode = currentNode.next;
+        currentNode = currentNode ? currentNode.next : null;
       }
     } else {
       currentNode = this.tail;
 
       for (let index = this.length - 1; index > position; index -= 1) {
-        currentNode = currentNode.prev;
+        currentNode = currentNode ? currentNode.prev : null;
       }
     }
 
     return currentNode;
   }
 
-  toArray() {
-    const songs = [];
+  toArray(): Array<TTrack & { index: number; isCurrent: boolean }> {
+    const songs: Array<TTrack & { index: number; isCurrent: boolean }> = [];
     let index = 0;
     let node = this.head;
 
