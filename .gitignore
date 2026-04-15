@@ -1,6 +1,7 @@
 node_modules
 .history
 /release
+/.npm-cache
 /dist
 /main.js
 /menu.js

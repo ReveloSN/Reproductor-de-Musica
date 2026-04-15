@@ -62,6 +62,9 @@ El comando hace esto:
 npm.cmd run start
 npm.cmd run build:ts
 npm.cmd run typecheck
+npm.cmd run pack:win
+npm.cmd run dist:win
+npm.cmd run dist:portable
 ```
 
 ## Flujo de compilacion
@@ -74,3 +77,19 @@ npm.cmd run typecheck
 
 - La carpeta `renderer/` fue retirada del flujo principal porque no se usaba en la version final de la app.
 - Si PowerShell bloquea `npm`, usa `npm.cmd`.
+
+## Empaquetado para Windows
+
+- `npm.cmd run pack:win`
+  Genera una carpeta ejecutable sin instalador para probar el empaquetado.
+- `npm.cmd run dist:win`
+  Genera un instalador de Windows en `release/`.
+- `npm.cmd run dist:portable`
+  Genera una version portable `.exe` en `release/`.
+
+## Como actualizar la app despues de cambios
+
+1. Haz tus cambios en el codigo.
+2. Sube la version en `package.json` si quieres una release nueva identificable.
+3. Ejecuta `npm.cmd run dist:win` o `npm.cmd run dist:portable`.
+4. Comparte el nuevo instalador o `.exe` generado en `release/`.
