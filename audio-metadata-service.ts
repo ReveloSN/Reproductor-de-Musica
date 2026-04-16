@@ -103,6 +103,49 @@ function createEmptyMetadata(): AudioFileMetadata {
   };
 }
 
+function mapAudioMetadata(metadata: IAudioMetadata): AudioFileMetadata {
+  const artwork = extractArtwork(metadata);
+
+  return {
+    title: normalizeText(metadata.common.title),
+    artist: normalizeText(metadata.common.artist || metadata.common.artists?.join(', ')),
+    album: normalizeText(metadata.common.album),
+    durationSeconds: normalizeDuration(metadata.format.duration),
+    genre: normalizeGenre(metadata.common.genre),
+    trackNumber: normalizeTrackNumber(metadata.common.track?.no),
+    artworkDataUrl: artwork.artworkDataUrl,
+    artworkMimeType: artwork.artworkMimeType,
+  };
+}
+
+export async function readAudioMetadataFromBuffer(
+  uint8Array: Uint8Array,
+  fileInfo?: { mimeType?: string; path?: string; size?: number | null }
+): Promise<AudioFileMetadata> {
+  try {
+    const musicMetadata = await getMusicMetadataModule();
+    const metadata = await musicMetadata.parseBuffer(
+      uint8Array,
+      {
+        mimeType: normalizeText(fileInfo?.mimeType) || undefined,
+        path: normalizeText(fileInfo?.path) || undefined,
+        size:
+          typeof fileInfo?.size === 'number' && Number.isFinite(fileInfo.size) && fileInfo.size > 0
+            ? fileInfo.size
+            : undefined,
+      },
+      {
+        duration: true,
+        skipCovers: false,
+      }
+    );
+
+    return mapAudioMetadata(metadata as IAudioMetadata);
+  } catch (_error) {
+    return createEmptyMetadata();
+  }
+}
+
 export async function readAudioMetadata(filePath: string): Promise<AudioFileMetadata> {
   try {
     const musicMetadata = await getMusicMetadataModule();
@@ -110,18 +153,7 @@ export async function readAudioMetadata(filePath: string): Promise<AudioFileMeta
       duration: true,
       skipCovers: false,
     });
-    const artwork = extractArtwork(metadata);
-
-    return {
-      title: normalizeText(metadata.common.title),
-      artist: normalizeText(metadata.common.artist || metadata.common.artists?.join(', ')),
-      album: normalizeText(metadata.common.album),
-      durationSeconds: normalizeDuration(metadata.format.duration),
-      genre: normalizeGenre(metadata.common.genre),
-      trackNumber: normalizeTrackNumber(metadata.common.track?.no),
-      artworkDataUrl: artwork.artworkDataUrl,
-      artworkMimeType: artwork.artworkMimeType,
-    };
+    return mapAudioMetadata(metadata);
   } catch (_error) {
     return createEmptyMetadata();
   }

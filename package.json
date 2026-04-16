@@ -5,12 +5,15 @@
   "main": "dist/main.js",
   "scripts": {
     "clean:dist": "node scripts/clean-dist.cjs",
-    "build:ts": "npm run clean:dist && tsc -p tsconfig.json && node scripts/copy-ui-static.cjs",
+    "build": "npm run clean:dist && tsc -p tsconfig.json && node scripts/copy-ui-static.cjs",
+    "build:ts": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "npm run build:ts && electron .",
-    "pack:win": "npm run build:ts && electron-builder --win --dir",
-    "dist:win": "npm run build:ts && electron-builder --win nsis",
-    "dist:portable": "npm run build:ts && electron-builder --win portable",
+    "start": "node dist/web-server.js",
+    "start:web": "npm run build && node dist/web-server.js",
+    "start:desktop": "npm run build && electron .",
+    "pack:win": "npm run build && electron-builder --win --dir",
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:portable": "npm run build && electron-builder --win portable",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -26,6 +29,9 @@
   "dependencies": {
     "music-metadata": "^11.12.3",
     "wavesurfer.js": "^7.12.6"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "build": {
     "appId": "com.revelosn.localaudioplayer",

@@ -19,6 +19,7 @@
     "main.ts",
     "menu.ts",
     "preload.ts",
+    "web-server.ts",
     "UI/**/*.ts"
   ],
   "exclude": [
