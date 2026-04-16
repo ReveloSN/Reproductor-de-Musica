@@ -1,5 +1,11 @@
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
-const DEFAULT_OPENAI_MODEL = process.env.OPENAI_PLAYLIST_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+
+function getDefaultOpenAIModel(): string {
+  return (
+    String(process.env.OPENAI_PLAYLIST_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim() ||
+    'gpt-4.1-mini'
+  );
+}
 
 interface OpenAIErrorPayload {
   error?: {
@@ -149,19 +155,20 @@ function normalizeSelectedTrackIds(
 
 export function getAIPlaylistConfig(): AIPlaylistConfig {
   const apiKey = getOpenAIApiKey();
+  const model = getDefaultOpenAIModel();
 
   if (!apiKey) {
     return {
       isConfigured: false,
-      model: DEFAULT_OPENAI_MODEL,
+      model,
       message: 'Configura OPENAI_API_KEY para habilitar playlists con IA.',
     };
   }
 
   return {
     isConfigured: true,
-    model: DEFAULT_OPENAI_MODEL,
-    message: `IA lista con ${DEFAULT_OPENAI_MODEL}. Creara playlists usando tu biblioteca cargada.`,
+    model,
+    message: `IA lista con ${model}. Creara playlists usando tu biblioteca cargada.`,
   };
 }
 
@@ -169,6 +176,7 @@ export async function generateAIPlaylist(
   request: AIPlaylistGenerateRequest
 ): Promise<AIPlaylistResult> {
   const apiKey = getOpenAIApiKey();
+  const model = getDefaultOpenAIModel();
   const prompt = String(request.prompt || '').trim();
   const tracks = Array.isArray(request.tracks) ? request.tracks.filter(Boolean) : [];
 
@@ -209,7 +217,7 @@ export async function generateAIPlaylist(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: DEFAULT_OPENAI_MODEL,
+      model,
       input: [
         {
           role: 'system',

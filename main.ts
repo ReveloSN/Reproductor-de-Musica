@@ -11,9 +11,16 @@ import {
 } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import {
+  clearStoredYouTubeApiKey,
+  getYouTubeApiKeyState,
+  initializeAppSettings,
+  saveStoredYouTubeApiKey,
+} from './app-settings';
 import buildMenu from './menu';
 import { generateAIPlaylist, getAIPlaylistConfig } from './ai-playlist-service';
 import { readAudioMetadata } from './audio-metadata-service';
+import { loadRuntimeEnv } from './env-config';
 import { fetchLyricsFromRemote } from './lyrics-remote-service';
 import { startLocalAppServer } from './local-http-server';
 import { getYouTubeConfig, searchYouTubeVideos } from './youtube-service';
@@ -242,6 +249,18 @@ ipcMain.handle('youtube:get-config', async (): Promise<YouTubeConfig> => {
   return getYouTubeConfig();
 });
 
+ipcMain.handle('youtube:get-api-key-state', async (): Promise<YouTubeApiKeyState> => {
+  return getYouTubeApiKeyState();
+});
+
+ipcMain.handle('youtube:save-api-key', async (_event, apiKey: string): Promise<YouTubeApiKeyState> => {
+  return saveStoredYouTubeApiKey(apiKey);
+});
+
+ipcMain.handle('youtube:clear-saved-api-key', async (): Promise<YouTubeApiKeyState> => {
+  return clearStoredYouTubeApiKey();
+});
+
 ipcMain.handle('youtube:search', async (_event, query: string): Promise<YouTubeSearchResponse> => {
   return searchYouTubeVideos(query);
 });
@@ -258,6 +277,12 @@ ipcMain.handle('youtube:open-external', async (_event, url: string): Promise<boo
 });
 
 void app.whenReady().then(async () => {
+  loadRuntimeEnv({
+    cwd: process.cwd(),
+    executableDir: path.dirname(process.execPath),
+    userDataDir: app.getPath('userData'),
+  });
+  await initializeAppSettings(app.getPath('userData'));
   const localServer = await startLocalAppServer(path.join(__dirname, 'UI'));
   localAppBaseUrl = localServer.baseUrl;
   configureYouTubeEmbedIdentity(localAppBaseUrl);

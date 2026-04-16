@@ -102,6 +102,13 @@ interface YouTubeConfig {
   message: string;
 }
 
+interface YouTubeApiKeyState {
+  hasConfiguredKey: boolean;
+  hasStoredApiKey: boolean;
+  source: 'env' | 'stored' | 'none';
+  message: string;
+}
+
 interface YouTubeVideoSummary {
   videoId: string;
   title: string;
@@ -153,6 +160,9 @@ interface AIPlaylistResult {
 
 interface YouTubeAPI {
   getConfig: () => Promise<YouTubeConfig>;
+  getApiKeyState: () => Promise<YouTubeApiKeyState>;
+  saveApiKey: (apiKey: string) => Promise<YouTubeApiKeyState>;
+  clearSavedApiKey: () => Promise<YouTubeApiKeyState>;
   searchVideos: (query: string) => Promise<YouTubeSearchResponse>;
   openVideo: (url: string) => Promise<boolean>;
 }

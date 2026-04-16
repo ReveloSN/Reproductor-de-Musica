@@ -58,6 +58,12 @@ contextBridge.exposeInMainWorld('audioAPI', {
 contextBridge.exposeInMainWorld('youtubeAPI', {
   getConfig: (): Promise<YouTubeConfig> =>
     ipcRenderer.invoke('youtube:get-config') as Promise<YouTubeConfig>,
+  getApiKeyState: (): Promise<YouTubeApiKeyState> =>
+    ipcRenderer.invoke('youtube:get-api-key-state') as Promise<YouTubeApiKeyState>,
+  saveApiKey: (apiKey: string): Promise<YouTubeApiKeyState> =>
+    ipcRenderer.invoke('youtube:save-api-key', apiKey) as Promise<YouTubeApiKeyState>,
+  clearSavedApiKey: (): Promise<YouTubeApiKeyState> =>
+    ipcRenderer.invoke('youtube:clear-saved-api-key') as Promise<YouTubeApiKeyState>,
   searchVideos: (query: string): Promise<YouTubeSearchResponse> =>
     ipcRenderer.invoke('youtube:search', query) as Promise<YouTubeSearchResponse>,
   openVideo: (url: string): Promise<boolean> =>

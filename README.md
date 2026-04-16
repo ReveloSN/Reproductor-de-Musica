@@ -34,6 +34,22 @@ npm.cmd install
 npm.cmd run start
 ```
 
+## Configuracion de claves API
+
+El repo no debe incluir claves reales. Si quieres habilitar YouTube y playlists con IA, crea un archivo `.env` en la raiz del proyecto con este formato:
+
+```env
+YOUTUBE_API_KEY=tu_api_key_de_youtube
+OPENAI_API_KEY=tu_api_key_de_openai
+OPENAI_PLAYLIST_MODEL=gpt-4.1-mini
+```
+
+Tambien puedes usar `YOUTUBE_DATA_API_KEY` o `GOOGLE_API_KEY` como alias para YouTube.
+
+Si no configuras estas claves, la app sigue abriendo y reproduciendo archivos locales, pero las funciones de YouTube e IA quedan deshabilitadas con un mensaje claro en pantalla.
+
+Tambien puedes abrir la app, ir al modulo de YouTube y guardar la API key localmente desde la interfaz. Esa clave queda guardada solo en ese equipo y no se sube al repo.
+
 ## Que hace `npm run start`
 
 Ese comando:
@@ -60,9 +76,15 @@ npm run dist:portable
 - `npm run dist:win`: genera un instalador de Windows en `release/`
 - `npm run dist:portable`: genera una version portable en `release/`
 
+## Usar claves en la app empaquetada
+
+Si generas la version portable, puedes poner un archivo `.env` al lado del `.exe` y la app lo leera automaticamente al iniciar. Tambien intentara leer un `.env` dentro de la carpeta de datos del usuario.
+
+Esto sirve para compartir la app sin subir secretos al repo. El repo puede ir limpio y la demo completa puede usar un `.env` local aparte.
+
 ## Activar playlists con IA
 
-Antes de iniciar la app, define `OPENAI_API_KEY` en la terminal:
+Antes de iniciar la app, puedes definir `OPENAI_API_KEY` en la terminal:
 
 ```powershell
 $env:OPENAI_API_KEY="tu_api_key"
@@ -70,6 +92,16 @@ npm.cmd run start
 ```
 
 Tambien puedes cambiar el modelo con `OPENAI_MODEL` o `OPENAI_PLAYLIST_MODEL`.
+
+## Que enviar al profesor
+
+Lo recomendable es compartir:
+
+1. El link del repo sin claves reales.
+2. Una release portable o el instalador generado en `release/`.
+3. Una nota corta indicando que los modulos de YouTube e IA usan un `.env` local por seguridad.
+
+Si el profesor solo necesita revisar el codigo y abrir la app, la parte local del reproductor funciona aun sin esas claves.
 
 ## Estructura general
 

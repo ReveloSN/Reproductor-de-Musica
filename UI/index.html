@@ -280,6 +280,31 @@
               </button>
             </div>
 
+            <div class="youtube-config-row">
+              <label class="search-field youtube-key-field" for="youtubeApiKeyInput">
+                <span class="search-icon">&#128274;</span>
+                <input
+                  id="youtubeApiKeyInput"
+                  type="password"
+                  placeholder="Pega aqui tu API key de YouTube"
+                  autocomplete="off"
+                />
+              </label>
+
+              <div class="youtube-key-actions">
+                <button id="youtubeSaveKeyButton" class="button button-secondary" type="button">
+                  Guardar clave
+                </button>
+                <button id="youtubeClearKeyButton" class="button button-secondary" type="button">
+                  Borrar clave local
+                </button>
+              </div>
+            </div>
+
+            <p id="youtubeKeyStatus" class="youtube-key-status">
+              Puedes guardar la API key localmente en este equipo sin subirla al repo.
+            </p>
+
             <p id="youtubeSearchStatus" class="youtube-search-status">
               Busca videos musicales oficiales, intenta reproducirlos en la app o abre el resultado en YouTube.
             </p>

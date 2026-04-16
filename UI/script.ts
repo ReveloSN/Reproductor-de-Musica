@@ -274,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
   syncNowPlayingView();
   void initializeAIPlaylistModule();
   void initializeYouTubeModule();
+  void initializeYouTubeApiKeyState();
 
   function getActivePlaylistRecord(): PlaylistRecord | null {
     return playlistManager.getActivePlaylist();
@@ -375,6 +376,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     elements.youtubeOpenFallbackButton.addEventListener('click', () => {
       void openCurrentYouTubeTrackExternally();
+    });
+    elements.youtubeSaveKeyButton.addEventListener('click', () => {
+      void saveYouTubeApiKey();
+    });
+    elements.youtubeClearKeyButton.addEventListener('click', () => {
+      void clearStoredYouTubeApiKey();
+    });
+    elements.youtubeApiKeyInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void saveYouTubeApiKey();
+      }
     });
     elements.muteButton.addEventListener('click', toggleMute);
     elements.volumeSlider.addEventListener('input', handleVolumeSliderInput);
@@ -551,6 +564,93 @@ document.addEventListener('DOMContentLoaded', () => {
         isConfigured: false,
         message: `No fue posible iniciar el modulo de YouTube: ${message}`,
       });
+    }
+  }
+
+  async function initializeYouTubeApiKeyState(): Promise<void> {
+    if (!youtubeAPI) {
+      renderYouTubeApiKeyState({
+        hasConfiguredKey: false,
+        hasStoredApiKey: false,
+        source: 'none',
+        message: 'No se encontro la integracion para guardar la API key de YouTube en esta sesion.',
+      });
+      return;
+    }
+
+    try {
+      const apiKeyState = await youtubeAPI.getApiKeyState();
+      renderYouTubeApiKeyState(apiKeyState);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      renderYouTubeApiKeyState({
+        hasConfiguredKey: false,
+        hasStoredApiKey: false,
+        source: 'none',
+        message: `No fue posible leer la configuracion local de YouTube: ${message}`,
+      });
+    }
+  }
+
+  function renderYouTubeApiKeyState(state: YouTubeApiKeyState): void {
+    elements.youtubeKeyStatus.textContent = state.message;
+    elements.youtubeKeyStatus.dataset.state = state.hasConfiguredKey ? 'ready' : 'error';
+    elements.youtubeClearKeyButton.disabled = !state.hasStoredApiKey;
+
+    if (state.source === 'stored') {
+      elements.youtubeApiKeyInput.placeholder = 'Clave local guardada. Pega otra aqui si quieres reemplazarla.';
+      return;
+    }
+
+    if (state.source === 'env') {
+      elements.youtubeApiKeyInput.placeholder =
+        'La app ya detecto una clave desde .env. Puedes guardar otra localmente si quieres.';
+      return;
+    }
+
+    elements.youtubeApiKeyInput.placeholder = 'Pega aqui tu API key de YouTube';
+  }
+
+  async function saveYouTubeApiKey(): Promise<void> {
+    if (!youtubeAPI) {
+      setFeedback('No se encontro la integracion segura de YouTube en preload/main.', 'error');
+      return;
+    }
+
+    const apiKey = String(elements.youtubeApiKeyInput.value || '').trim();
+
+    if (!apiKey) {
+      setFeedback('Pega una API key de YouTube antes de guardarla.', 'error');
+      return;
+    }
+
+    try {
+      await youtubeAPI.saveApiKey(apiKey);
+      elements.youtubeApiKeyInput.value = '';
+      await initializeYouTubeModule();
+      await initializeYouTubeApiKeyState();
+      setFeedback('La API key de YouTube fue guardada localmente en este equipo.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setFeedback(`No fue posible guardar la API key de YouTube: ${message}`, 'error');
+    }
+  }
+
+  async function clearStoredYouTubeApiKey(): Promise<void> {
+    if (!youtubeAPI) {
+      setFeedback('No se encontro la integracion segura de YouTube en preload/main.', 'error');
+      return;
+    }
+
+    try {
+      await youtubeAPI.clearSavedApiKey();
+      elements.youtubeApiKeyInput.value = '';
+      await initializeYouTubeModule();
+      await initializeYouTubeApiKeyState();
+      setFeedback('La API key guardada localmente fue eliminada de este equipo.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setFeedback(`No fue posible borrar la API key local de YouTube: ${message}`, 'error');
     }
   }
 

@@ -3,6 +3,8 @@ node_modules
 /release
 /.npm-cache
 /dist
+.env
+.env.local
 /main.js
 /menu.js
 /preload.js

@@ -32,6 +32,10 @@ interface RendererElements {
   youtubeSearchButton: HTMLButtonElement;
   youtubeSearchStatus: HTMLParagraphElement;
   youtubeApiStatus: HTMLParagraphElement;
+  youtubeApiKeyInput: HTMLInputElement;
+  youtubeSaveKeyButton: HTMLButtonElement;
+  youtubeClearKeyButton: HTMLButtonElement;
+  youtubeKeyStatus: HTMLParagraphElement;
   youtubePlaylistTarget: HTMLSelectElement;
   aiPromptInput: HTMLTextAreaElement;
   aiGenerateButton: HTMLButtonElement;
