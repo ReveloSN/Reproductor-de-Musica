@@ -26,6 +26,15 @@ interface YouTubePlayerViewLike {
   destroy: () => void;
 }
 
+interface AIPlaylistViewLike {
+  bindEvents: (callbacks: {
+    onGenerate: (prompt: string) => void;
+  }) => void;
+  renderConfig: (config: AIPlaylistConfig) => void;
+  setLoading: (prompt: string) => void;
+  renderResult: (result: AIPlaylistResult) => void;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const playlistManager = new window.PlaylistManager(window.DoublyLinkedPlaylist);
   const lyricsService = new window.LyricsService();
@@ -60,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
   lastNonMutedVolume = normalizeVolumeValue(Number(elements.volumeSlider.value)) || 70;
   const playlistView = new window.PlaylistView(document, elements);
   const waveformController = new window.WaveformController(elements, elements.audioElement);
+  const aiPlaylistView = createAIPlaylistView();
   const youtubeSearchView = createYouTubeSearchView();
   const youtubePlayerView = createYouTubePlayerView();
   const nowPlayingView = new window.NowPlayingView(elements, {
@@ -69,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const playbackController = new window.PlaybackController(elements, formatDuration);
   const audioAPI = window.audioAPI;
+  const aiAPI = window.aiAPI;
   const youtubeAPI = window.youtubeAPI;
 
   if (!audioAPI) {
@@ -80,6 +91,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const electronAudioAPI: AudioAPI = audioAPI;
+
+  function createAIPlaylistView(): AIPlaylistViewLike {
+    try {
+      return new window.AiPlaylistView(document, elements);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      markAIModuleUnavailable(`No fue posible iniciar el modulo de IA: ${message}`);
+      return {
+        bindEvents: () => {
+          // The AI module is unavailable in this session.
+        },
+        renderConfig: (config) => {
+          elements.aiConfigStatus.textContent = config.message;
+        },
+        setLoading: () => {
+          elements.aiStatus.textContent = 'El modulo de IA no esta disponible en esta sesion.';
+        },
+        renderResult: (result) => {
+          elements.aiResultTitle.textContent = result.playlistName || 'Sin sugerencia todavia';
+          elements.aiResultSummary.textContent = result.summary || result.message;
+          elements.aiResultCount.textContent = `${result.trackIds.length} canciones`;
+        },
+      };
+    }
+  }
 
   function createYouTubeSearchView(): YouTubeSearchViewLike {
     try {
@@ -168,6 +204,16 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.youtubeResults.replaceChildren();
   }
 
+  function markAIModuleUnavailable(message: string): void {
+    elements.aiConfigStatus.textContent = message;
+    elements.aiConfigStatus.dataset.state = 'error';
+    elements.aiStatus.textContent =
+      'La generacion de playlists con IA no pudo inicializarse en esta sesion.';
+    elements.aiStatus.dataset.state = 'error';
+    elements.aiPromptInput.disabled = true;
+    elements.aiGenerateButton.disabled = true;
+  }
+
   const songFactory = new window.SongFactory({
     audioAPI,
     supportedExtensions,
@@ -226,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setPlayButtonState(false);
   syncMuteButtonState();
   syncNowPlayingView();
+  void initializeAIPlaylistModule();
   void initializeYouTubeModule();
 
   function getActivePlaylistRecord(): PlaylistRecord | null {
@@ -307,6 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     elements.playlistList.addEventListener('click', handlePlaylistListClick);
     nowPlayingView.bindEvents(openNowPlayingView);
+    aiPlaylistView.bindEvents({
+      onGenerate: (prompt) => {
+        void generatePlaylistWithAI(prompt);
+      },
+    });
     youtubeSearchView.bindEvents({
       onSearch: (query) => {
         void searchYouTubeVideos(query);
@@ -456,6 +508,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function initializeAIPlaylistModule(): Promise<void> {
+    if (!aiAPI) {
+      aiPlaylistView.renderConfig({
+        isConfigured: false,
+        model: '',
+        message: 'No se encontro la integracion segura de IA en preload/main.',
+      });
+      return;
+    }
+
+    try {
+      const config = await aiAPI.getConfig();
+      aiPlaylistView.renderConfig(config);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      aiPlaylistView.renderConfig({
+        isConfigured: false,
+        model: '',
+        message: `No fue posible iniciar el modulo de IA: ${message}`,
+      });
+    }
+  }
+
   async function initializeYouTubeModule(): Promise<void> {
     youtubeSearchView.syncPlaylistTargets(playlistManager.getPlaylists(), playlistManager.activePlaylistId);
 
@@ -509,6 +584,115 @@ document.addEventListener('DOMContentLoaded', () => {
         results: [],
         message: `No fue posible consultar YouTube: ${message}`,
         query,
+      });
+    }
+  }
+
+  function collectAIPlaylistCandidates(): AIPlaylistCandidate[] {
+    return Array.from(playlistManager.songLibraryById.values())
+      .map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        genre: track.genre,
+        durationText: track.durationText,
+        source: track.source,
+        isFavorite: track.isFavorite,
+      }))
+      .sort((left, right) =>
+        `${left.title} ${left.artist}`.localeCompare(`${right.title} ${right.artist}`, 'es', {
+          sensitivity: 'base',
+        })
+      );
+  }
+
+  async function generatePlaylistWithAI(prompt: string): Promise<void> {
+    if (!aiAPI) {
+      aiPlaylistView.renderConfig({
+        isConfigured: false,
+        model: '',
+        message: 'No se encontro la integracion segura de IA en preload/main.',
+      });
+      return;
+    }
+
+    const normalizedPrompt = String(prompt || '').trim();
+
+    if (!normalizedPrompt) {
+      aiPlaylistView.renderResult({
+        status: 'error',
+        playlistName: '',
+        summary: '',
+        trackIds: [],
+        message: 'Escribe una descripcion para generar la playlist.',
+      });
+      return;
+    }
+
+    const candidates = collectAIPlaylistCandidates();
+
+    if (candidates.length === 0) {
+      aiPlaylistView.renderResult({
+        status: 'error',
+        playlistName: '',
+        summary: '',
+        trackIds: [],
+        message: 'Primero carga canciones en la app para que la IA pueda elegir.',
+      });
+      return;
+    }
+
+    aiPlaylistView.setLoading(normalizedPrompt);
+
+    try {
+      const result = await aiAPI.generatePlaylist({
+        prompt: normalizedPrompt,
+        tracks: candidates,
+      });
+
+      aiPlaylistView.renderResult(result);
+
+      if (result.status !== 'available' || result.trackIds.length === 0) {
+        return;
+      }
+
+      const suggestedName =
+        playlistManager.normalizeName(result.playlistName) || 'Playlist IA';
+      const playlistName = getUniquePlaylistName(suggestedName);
+      const createResult = playlistManager.createPlaylist(playlistName);
+
+      if (!createResult.ok || !createResult.playlist) {
+        setFeedback(createResult.error || 'No fue posible crear la playlist sugerida por IA.', 'error');
+        return;
+      }
+
+      const tracks = result.trackIds
+        .map((trackId) => playlistManager.getSongById(trackId))
+        .filter((track): track is Track => Boolean(track));
+
+      if (tracks.length === 0) {
+        setFeedback('La IA no devolvio canciones validas de tu biblioteca actual.', 'error');
+        return;
+      }
+
+      const targetPlaylist = createResult.playlist;
+      playlistManager.addSongsToPlaylist(targetPlaylist.id, tracks, { mode: 'end' });
+      switchActivePlaylist(targetPlaylist.id, false);
+      renderPlaylists();
+
+      setFeedback(
+        `La IA creo "${targetPlaylist.name}" con ${tracks.length} cancion(es).`,
+        'success'
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      aiPlaylistView.renderResult({
+        status: 'error',
+        playlistName: '',
+        summary: '',
+        trackIds: [],
+        message: `No fue posible generar la playlist con IA: ${message}`,
       });
     }
   }

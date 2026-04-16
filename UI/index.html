@@ -40,6 +40,12 @@
               <strong>YouTube</strong>
             </div>
           </button>
+          <button class="nav-item" type="button" data-scroll-target="aiSection">
+            <span class="nav-icon">04</span>
+            <div>
+              <strong>IA</strong>
+            </div>
+          </button>
         </nav>
 
         <section class="sidebar-card">
@@ -190,6 +196,56 @@
               <span id="playbackStatus" class="status-pill">En espera</span>
               <span id="shuffleStateLabel" class="mode-pill">Shuffle off</span>
               <span id="repeatStateLabel" class="mode-pill">Repeat off</span>
+            </div>
+          </section>
+
+          <section id="aiSection" class="ai-panel">
+            <div class="ai-panel-header">
+              <div>
+                <p class="eyebrow">IA</p>
+                <h3>Playlist con IA</h3>
+                <p id="aiConfigStatus" class="ai-config-status">
+                  Configura OPENAI_API_KEY para habilitar playlists inteligentes.
+                </p>
+              </div>
+
+              <span class="status-chip">Usa canciones ya cargadas</span>
+            </div>
+
+            <div class="ai-grid">
+              <article class="ai-card">
+                <label class="field ai-field" for="aiPromptInput">
+                  <span>Describe la playlist que quieres</span>
+                  <textarea
+                    id="aiPromptInput"
+                    rows="5"
+                    placeholder="Ej: una playlist nocturna, suave y melancolica con favoritas y temas indie"
+                  ></textarea>
+                </label>
+
+                <div class="ai-actions">
+                  <button id="aiGenerateButton" class="button button-primary" type="button">
+                    Crear playlist con IA
+                  </button>
+                </div>
+
+                <p id="aiStatus" class="ai-status">
+                  Describe el mood, genero, energia o situacion y la IA elegira canciones de tu biblioteca.
+                </p>
+              </article>
+
+              <article class="ai-card ai-result-card">
+                <p class="eyebrow">Resultado</p>
+                <h4 id="aiResultTitle">Sin sugerencia todavia</h4>
+
+                <div class="ai-result-meta">
+                  <span id="aiResultCount" class="status-chip">0 canciones</span>
+                </div>
+
+                <p id="aiResultSummary" class="ai-result-summary">
+                  Cuando la IA termine, aqui veras el nombre propuesto y el resumen de la playlist.
+                </p>
+              </article>
             </div>
           </section>
 
@@ -553,6 +609,7 @@
     <script src="playback-controller.js"></script>
     <script src="playlist-view.js"></script>
     <script src="now-playing-view.js"></script>
+    <script src="ai-playlist-view.js"></script>
     <script src="youtube-search-view.js"></script>
     <script src="youtube-player-view.js"></script>
     <script src="song-factory.js"></script>

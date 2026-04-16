@@ -63,3 +63,10 @@ contextBridge.exposeInMainWorld('youtubeAPI', {
   openVideo: (url: string): Promise<boolean> =>
     ipcRenderer.invoke('youtube:open-external', url) as Promise<boolean>,
 });
+
+contextBridge.exposeInMainWorld('aiAPI', {
+  getConfig: (): Promise<AIPlaylistConfig> =>
+    ipcRenderer.invoke('ai:get-config') as Promise<AIPlaylistConfig>,
+  generatePlaylist: (request: AIPlaylistGenerateRequest): Promise<AIPlaylistResult> =>
+    ipcRenderer.invoke('ai:generate-playlist', request) as Promise<AIPlaylistResult>,
+});

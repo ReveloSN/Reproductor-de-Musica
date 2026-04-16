@@ -121,10 +121,45 @@ interface YouTubeSearchResponse {
   query: string;
 }
 
+interface AIPlaylistCandidate {
+  id: string;
+  title: string;
+  artist: string;
+  album: string | null;
+  genre: string | null;
+  durationText: string;
+  source: TrackSource;
+  isFavorite: boolean;
+}
+
+interface AIPlaylistGenerateRequest {
+  prompt: string;
+  tracks: AIPlaylistCandidate[];
+}
+
+interface AIPlaylistConfig {
+  isConfigured: boolean;
+  model: string;
+  message: string;
+}
+
+interface AIPlaylistResult {
+  status: LookupStatus;
+  playlistName: string;
+  summary: string;
+  trackIds: string[];
+  message: string;
+}
+
 interface YouTubeAPI {
   getConfig: () => Promise<YouTubeConfig>;
   searchVideos: (query: string) => Promise<YouTubeSearchResponse>;
   openVideo: (url: string) => Promise<boolean>;
+}
+
+interface AIAPI {
+  getConfig: () => Promise<AIPlaylistConfig>;
+  generatePlaylist: (request: AIPlaylistGenerateRequest) => Promise<AIPlaylistResult>;
 }
 
 interface AudioAPI {
@@ -148,6 +183,7 @@ interface VersionsAPI {
 interface Window {
   audioAPI?: AudioAPI;
   youtubeAPI?: YouTubeAPI;
+  aiAPI?: AIAPI;
   versions: VersionsAPI;
   WaveSurfer?: WaveSurferConstructor;
   YT?: YouTubeIframeApiNamespace;
@@ -164,6 +200,7 @@ interface Window {
   PlaybackController: typeof PlaybackController;
   SongFactory: typeof SongFactory;
   PlaylistActions: typeof PlaylistActions;
+  AiPlaylistView: typeof AiPlaylistView;
   YoutubeSearchView: typeof YoutubeSearchView;
   YoutubePlayerView: typeof YoutubePlayerView;
 }

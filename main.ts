@@ -12,6 +12,7 @@ import {
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import buildMenu from './menu';
+import { generateAIPlaylist, getAIPlaylistConfig } from './ai-playlist-service';
 import { readAudioMetadata } from './audio-metadata-service';
 import { fetchLyricsFromRemote } from './lyrics-remote-service';
 import { startLocalAppServer } from './local-http-server';
@@ -225,6 +226,17 @@ ipcMain.handle('audio:read-metadata', async (_event, filePath: string): Promise<
 ipcMain.handle('lyrics:lookup', async (_event, query: LyricsLookupQuery): Promise<LyricsResult> => {
   return fetchLyricsFromRemote(query);
 });
+
+ipcMain.handle('ai:get-config', async (): Promise<AIPlaylistConfig> => {
+  return getAIPlaylistConfig();
+});
+
+ipcMain.handle(
+  'ai:generate-playlist',
+  async (_event, request: AIPlaylistGenerateRequest): Promise<AIPlaylistResult> => {
+    return generateAIPlaylist(request);
+  }
+);
 
 ipcMain.handle('youtube:get-config', async (): Promise<YouTubeConfig> => {
   return getYouTubeConfig();

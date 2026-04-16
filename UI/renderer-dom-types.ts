@@ -33,6 +33,13 @@ interface RendererElements {
   youtubeSearchStatus: HTMLParagraphElement;
   youtubeApiStatus: HTMLParagraphElement;
   youtubePlaylistTarget: HTMLSelectElement;
+  aiPromptInput: HTMLTextAreaElement;
+  aiGenerateButton: HTMLButtonElement;
+  aiConfigStatus: HTMLParagraphElement;
+  aiStatus: HTMLParagraphElement;
+  aiResultTitle: HTMLHeadingElement;
+  aiResultSummary: HTMLParagraphElement;
+  aiResultCount: HTMLSpanElement;
   youtubeResults: HTMLDivElement;
   youtubePlayerSurface: HTMLDivElement;
   youtubePlayerTarget: HTMLDivElement;
