@@ -181,6 +181,7 @@ interface AudioAPI {
   basename: (filePath: string) => string;
   extname: (filePath: string) => string;
   readAudioMetadata: (filePath: string) => Promise<AudioFileMetadata>;
+  readAudioBlob?: (filePath: string) => Promise<Blob | null>;
   fetchLyrics: (query: LyricsLookupQuery) => Promise<LyricsResult>;
 }
 

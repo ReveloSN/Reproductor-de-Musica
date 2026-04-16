@@ -161,14 +161,15 @@ export function getAIPlaylistConfig(): AIPlaylistConfig {
     return {
       isConfigured: false,
       model,
-      message: 'Configura OPENAI_API_KEY para habilitar playlists con IA.',
+      message:
+        'Configura OPENAI_API_KEY en Railway o en las variables del servidor para habilitar playlists con IA.',
     };
   }
 
   return {
     isConfigured: true,
     model,
-    message: `IA lista con ${model}. Creara playlists usando tu biblioteca cargada.`,
+    message: `La generacion con IA esta disponible desde la configuracion del servidor (${model}).`,
   };
 }
 
@@ -186,7 +187,7 @@ export async function generateAIPlaylist(
       playlistName: '',
       summary: '',
       trackIds: [],
-      message: 'OPENAI_API_KEY no esta configurada.',
+      message: 'La IA no esta configurada en el servidor.',
     };
   }
 

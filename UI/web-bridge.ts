@@ -309,6 +309,9 @@ window.audioAPI = {
   readAudioMetadata: (filePath: string): Promise<AudioFileMetadata> => {
     return requestAudioMetadata(filePath);
   },
+  readAudioBlob: async (filePath: string): Promise<Blob | null> => {
+    return browserFileRecords.get(filePath)?.file || null;
+  },
   fetchLyrics: (query: LyricsLookupQuery): Promise<LyricsResult> => {
     return postJson<LyricsLookupQuery, LyricsResult>('/api/lyrics/lookup', query);
   },

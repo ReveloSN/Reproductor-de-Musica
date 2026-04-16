@@ -1039,6 +1039,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updatePlaybackProgress();
+    window.requestAnimationFrame(() => {
+      waveformController.refreshLayout();
+    });
   }
 
   function closeNowPlayingView(): void {

@@ -52,6 +52,26 @@ class WaveformController {
     return this.waveSurfer;
   }
 
+  private async resolveAudioBlob(song: Track): Promise<Blob | null> {
+    const audioAPI = window.audioAPI;
+
+    if (!audioAPI?.readAudioBlob) {
+      return null;
+    }
+
+    const lookupPath = song.filePath || song.path;
+
+    if (!lookupPath) {
+      return null;
+    }
+
+    try {
+      return await audioAPI.readAudioBlob(lookupPath);
+    } catch (_error) {
+      return null;
+    }
+  }
+
   syncSong(song: Track | null): void {
     if (!song) {
       this.currentSongId = '';
@@ -98,29 +118,49 @@ class WaveformController {
     this.currentSongId = song.id;
     this.setStatus('loading', 'Cargando forma de onda...');
 
-    void waveSurfer
-      .load(song.url)
-      .then(() => {
+    void (async () => {
+      try {
+        const songBlob = await this.resolveAudioBlob(song);
+
+        if (token !== this.loadToken) {
+          return;
+        }
+
+        if (songBlob) {
+          await waveSurfer.loadBlob(songBlob);
+        } else {
+          await waveSurfer.load(song.url);
+        }
+
         if (token !== this.loadToken) {
           return;
         }
 
         this.setStatus('ready', 'Forma de onda lista. Puedes hacer clic para moverte.');
-      })
-      .catch((error: Error) => {
+      } catch (error) {
         if (token !== this.loadToken) {
           return;
         }
 
+        const message = error instanceof Error ? error.message : String(error);
         this.setStatus(
           'error',
-          `No fue posible cargar la forma de onda de "${song.title}": ${error.message}`
+          `No fue posible cargar la forma de onda de "${song.title}": ${message}`
         );
-      });
+      }
+    })();
   }
 
   clearError(message: string): void {
     this.setStatus('error', message);
+  }
+
+  refreshLayout(): void {
+    if (!this.waveSurfer) {
+      return;
+    }
+
+    this.waveSurfer.setOptions({});
   }
 
   destroy(): void {

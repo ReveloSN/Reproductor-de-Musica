@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('audioAPI', {
   extname,
   readAudioMetadata: (filePath: string): Promise<AudioFileMetadata> =>
     ipcRenderer.invoke('audio:read-metadata', filePath) as Promise<AudioFileMetadata>,
+  readAudioBlob: async (): Promise<Blob | null> => null,
   fetchLyrics: (query: LyricsLookupQuery): Promise<LyricsResult> =>
     ipcRenderer.invoke('lyrics:lookup', query) as Promise<LyricsResult>,
 });
