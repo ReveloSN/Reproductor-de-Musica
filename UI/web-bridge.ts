@@ -6,12 +6,24 @@ interface BrowserFileRecord {
   signature: string;
 }
 
+interface PersistedBrowserFileRecord {
+  filePath: string;
+  file: File;
+  metadata: AudioFileMetadata | null;
+  signature: string;
+}
+
 type FileSelectionInput = HTMLInputElement & {
   webkitdirectory?: boolean;
 };
 
 const browserFileRecords = new Map<string, BrowserFileRecord>();
 const AUDIO_ACCEPT_VALUE = '.mp3,.wav,.ogg,.m4a,audio/*';
+const AUDIO_LIBRARY_DB_NAME = 'local-audio-player-audio-library';
+const AUDIO_LIBRARY_DB_VERSION = 1;
+const AUDIO_LIBRARY_STORE_NAME = 'audio-files';
+
+let audioLibraryDbPromise: Promise<IDBDatabase> | null = null;
 
 function createEmptyMetadata(): AudioFileMetadata {
   return {
@@ -52,6 +64,113 @@ function normalizeDisplayPath(value: string): string {
 
 function createFileSignature(file: File): string {
   return [file.name, file.size, file.lastModified, file.type].join(':');
+}
+
+function openAudioLibraryDb(): Promise<IDBDatabase> {
+  if (audioLibraryDbPromise) {
+    return audioLibraryDbPromise;
+  }
+
+  audioLibraryDbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error('IndexedDB no esta disponible en este navegador.'));
+      return;
+    }
+
+    const request = window.indexedDB.open(AUDIO_LIBRARY_DB_NAME, AUDIO_LIBRARY_DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+
+      if (!database.objectStoreNames.contains(AUDIO_LIBRARY_STORE_NAME)) {
+        database.createObjectStore(AUDIO_LIBRARY_STORE_NAME, {
+          keyPath: 'filePath',
+        });
+      }
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      reject(request.error || new Error('No fue posible abrir IndexedDB.'));
+    };
+  }).catch((error) => {
+    audioLibraryDbPromise = null;
+    throw error;
+  });
+
+  return audioLibraryDbPromise as Promise<IDBDatabase>;
+}
+
+async function persistBrowserFileRecord(filePath: string, record: BrowserFileRecord): Promise<void> {
+  try {
+    const database = await openAudioLibraryDb();
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(AUDIO_LIBRARY_STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(AUDIO_LIBRARY_STORE_NAME);
+      const payload: PersistedBrowserFileRecord = {
+        filePath,
+        file: record.file,
+        metadata: record.metadata,
+        signature: record.signature,
+      };
+
+      store.put(payload);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () =>
+        reject(transaction.error || new Error('No fue posible guardar el archivo local.'));
+    });
+  } catch (_error) {
+    // Ignore persistence failures and keep the in-memory session working.
+  }
+}
+
+async function restorePersistedBrowserFileRecords(): Promise<string[]> {
+  try {
+    const database = await openAudioLibraryDb();
+    const records = await new Promise<PersistedBrowserFileRecord[]>((resolve, reject) => {
+      const transaction = database.transaction(AUDIO_LIBRARY_STORE_NAME, 'readonly');
+      const store = transaction.objectStore(AUDIO_LIBRARY_STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        resolve((request.result as PersistedBrowserFileRecord[]) || []);
+      };
+
+      request.onerror = () => {
+        reject(request.error || new Error('No fue posible restaurar la biblioteca local.'));
+      };
+    });
+
+    const restoredPaths: string[] = [];
+
+    records.forEach((record) => {
+      if (!record?.filePath || !record.file) {
+        return;
+      }
+
+      if (browserFileRecords.has(record.filePath)) {
+        restoredPaths.push(record.filePath);
+        return;
+      }
+
+      browserFileRecords.set(record.filePath, {
+        file: record.file,
+        objectUrl: URL.createObjectURL(record.file),
+        metadata: record.metadata || null,
+        metadataPromise: null,
+        signature: record.signature || createFileSignature(record.file),
+      });
+      restoredPaths.push(record.filePath);
+    });
+
+    return restoredPaths;
+  } catch (_error) {
+    return [];
+  }
 }
 
 function withNumericSuffix(filePath: string, suffix: number): string {
@@ -103,13 +222,15 @@ function registerSelectedFiles(files: File[], { preferRelativePath = false }: { 
       return;
     }
 
-    browserFileRecords.set(displayPath, {
+    const nextRecord: BrowserFileRecord = {
       file,
       objectUrl: URL.createObjectURL(file),
       metadata: null,
       metadataPromise: null,
       signature: createFileSignature(file),
-    });
+    };
+    browserFileRecords.set(displayPath, nextRecord);
+    void persistBrowserFileRecord(displayPath, nextRecord);
     resolvedPaths.push(displayPath);
   });
 
@@ -194,10 +315,12 @@ async function requestAudioMetadata(filePath: string): Promise<AudioFileMetadata
 
         const metadata = (await response.json()) as AudioFileMetadata;
         record.metadata = metadata;
+        void persistBrowserFileRecord(filePath, record);
         return metadata;
       } catch (_error) {
         const emptyMetadata = createEmptyMetadata();
         record.metadata = emptyMetadata;
+        void persistBrowserFileRecord(filePath, record);
         return emptyMetadata;
       } finally {
         record.metadataPromise = null;
@@ -311,6 +434,9 @@ window.audioAPI = {
   },
   readAudioBlob: async (filePath: string): Promise<Blob | null> => {
     return browserFileRecords.get(filePath)?.file || null;
+  },
+  restorePersistedAudioFiles: async (): Promise<string[]> => {
+    return restorePersistedBrowserFileRecords();
   },
   fetchLyrics: (query: LyricsLookupQuery): Promise<LyricsResult> => {
     return postJson<LyricsLookupQuery, LyricsResult>('/api/lyrics/lookup', query);

@@ -1,5 +1,16 @@
 type AddSongsMode = 'start' | 'end' | 'position';
 const SIDEBAR_STORAGE_KEY = 'local-audio-player.sidebar-collapsed';
+const PLAYLIST_STATE_STORAGE_KEY = 'local-audio-player.playlist-state.v1';
+const PLAYLIST_STATE_SCHEMA_VERSION = 1;
+
+type PlaylistDropPosition = 'before' | 'after';
+
+interface PersistedPlaylistSession {
+  version: number;
+  playlistState: PersistedPlaylistState;
+  shuffleEnabled: boolean;
+  repeatMode: RepeatMode;
+}
 
 interface YouTubeSearchViewLike {
   bindEvents: (callbacks: {
@@ -65,6 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let youtubeProgressTimer: number | null = null;
   let mutedVolume: number | null = null;
   let lastNonMutedVolume = 70;
+  let persistenceReady = false;
+  let playlistPersistTimer: number | null = null;
+  let lastPersistedPlaylistSnapshot = '';
+  let armedDragRow: HTMLLIElement | null = null;
+  let draggedPlaylistSongIndex: number | null = null;
+  let activeDropIndicator: { row: HTMLLIElement; position: PlaylistDropPosition } | null = null;
 
   const elements = window.createRendererElements(document);
   lastNonMutedVolume = normalizeVolumeValue(Number(elements.volumeSlider.value)) || 70;
@@ -225,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderPlaylist();
       syncPlayerInfo();
       renderPlaylists();
+      schedulePlaylistStatePersistence();
     },
   });
 
@@ -263,19 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 
   wireEvents();
-  initializeSidebarState();
-  renderPlaylists();
-  renderPlaylist();
-  syncPlayerInfo();
-  syncControlStates();
-  updatePositionInputs();
-  updatePlaybackProgress();
-  setPlaybackStatus('En espera');
-  setPlayButtonState(false);
-  syncMuteButtonState();
-  syncNowPlayingView();
-  void initializeAIPlaylistModule();
-  void initializeYouTubeModule();
+  void initializeApplication();
 
   function getActivePlaylistRecord(): PlaylistRecord | null {
     return playlistManager.getActivePlaylist();
@@ -299,8 +305,287 @@ document.addEventListener('DOMContentLoaded', () => {
     return activeList ? activeList.length : 0;
   }
 
+  async function initializeApplication(): Promise<void> {
+    initializeSidebarState();
+    await restorePersistedPlaylistSession();
+    renderPlaylists();
+    renderPlaylist();
+    syncPlayerInfo();
+    syncControlStates();
+    updatePlaybackProgress();
+    setPlaybackStatus('En espera');
+    setPlayButtonState(false);
+    syncMuteButtonState();
+    syncNowPlayingView();
+    void initializeAIPlaylistModule();
+    void initializeYouTubeModule();
+  }
+
+  function isValidRepeatMode(value: unknown): value is RepeatMode {
+    return value === 'off' || value === 'one' || value === 'all';
+  }
+
+  function createPersistableTrack(song: Track): Track {
+    if (song.source === 'youtube') {
+      const youtubeUrl = String(song.youtubeUrl || song.url || '').trim();
+
+      return {
+        ...song,
+        url: youtubeUrl,
+        youtubeUrl,
+      };
+    }
+
+    return {
+      ...song,
+      url: '',
+      artworkDataUrl: null,
+      artworkMimeType: null,
+    };
+  }
+
+  function buildPersistedPlaylistSession(): PersistedPlaylistSession {
+    const exportedState = playlistManager.exportState();
+
+    return {
+      version: PLAYLIST_STATE_SCHEMA_VERSION,
+      playlistState: {
+        ...exportedState,
+        songs: exportedState.songs.map((song) => createPersistableTrack(song)),
+      },
+      shuffleEnabled,
+      repeatMode,
+    };
+  }
+
+  function safeSerializePersistedPlaylistSession(): string {
+    return JSON.stringify(buildPersistedPlaylistSession());
+  }
+
+  function readPersistedPlaylistSession(): PersistedPlaylistSession | null {
+    try {
+      const rawSession = window.localStorage.getItem(PLAYLIST_STATE_STORAGE_KEY);
+
+      if (!rawSession) {
+        return null;
+      }
+
+      const parsed = JSON.parse(rawSession) as Partial<PersistedPlaylistSession>;
+
+      if (!parsed || typeof parsed !== 'object' || !parsed.playlistState) {
+        return null;
+      }
+
+      return {
+        version:
+          typeof parsed.version === 'number'
+            ? parsed.version
+            : PLAYLIST_STATE_SCHEMA_VERSION,
+        playlistState: parsed.playlistState,
+        shuffleEnabled: Boolean(parsed.shuffleEnabled),
+        repeatMode: isValidRepeatMode(parsed.repeatMode) ? parsed.repeatMode : 'off',
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function normalizePersistedTrack(song: Track): Track | null {
+    if (!song?.id || !song?.source) {
+      return null;
+    }
+
+    if (song.source === 'youtube') {
+      const youtubeUrl = String(song.youtubeUrl || song.url || '').trim();
+
+      if (!youtubeUrl) {
+        return null;
+      }
+
+      return {
+        ...song,
+        url: youtubeUrl,
+        youtubeUrl,
+        path: youtubeUrl,
+        filePath: '',
+      };
+    }
+
+    const localPath = String(song.filePath || song.path || '').trim();
+
+    if (!localPath) {
+      return null;
+    }
+
+    const resolvedUrl = electronAudioAPI.filePathToUrl(localPath);
+
+    if (!resolvedUrl) {
+      return null;
+    }
+
+    return {
+      ...song,
+      path: localPath,
+      filePath: localPath,
+      url: resolvedUrl,
+      source: 'local',
+      sourceLabel: song.sourceLabel || 'Archivo local',
+    };
+  }
+
+  function normalizePersistedPlaylistState(
+    playlistState: PersistedPlaylistState | null | undefined
+  ): PersistedPlaylistState | null {
+    if (!playlistState || !Array.isArray(playlistState.songs) || !Array.isArray(playlistState.playlists)) {
+      return null;
+    }
+
+    const normalizedSongs = playlistState.songs
+      .map((song) => normalizePersistedTrack(song))
+      .filter((song): song is Track => Boolean(song));
+
+    return {
+      songs: normalizedSongs,
+      playlists: playlistState.playlists,
+      activePlaylistId:
+        typeof playlistState.activePlaylistId === 'string' ? playlistState.activePlaylistId : 'main',
+    };
+  }
+
+  function schedulePlaylistStatePersistence(): void {
+    if (!persistenceReady) {
+      return;
+    }
+
+    if (playlistPersistTimer !== null) {
+      window.clearTimeout(playlistPersistTimer);
+    }
+
+    playlistPersistTimer = window.setTimeout(() => {
+      playlistPersistTimer = null;
+      persistPlaylistState();
+    }, 180);
+  }
+
+  function persistPlaylistState(force = false): void {
+    if (!persistenceReady && !force) {
+      return;
+    }
+
+    if (playlistPersistTimer !== null) {
+      window.clearTimeout(playlistPersistTimer);
+      playlistPersistTimer = null;
+    }
+
+    try {
+      const nextSnapshot = safeSerializePersistedPlaylistSession();
+
+      if (!force && nextSnapshot === lastPersistedPlaylistSnapshot) {
+        return;
+      }
+
+      window.localStorage.setItem(PLAYLIST_STATE_STORAGE_KEY, nextSnapshot);
+      lastPersistedPlaylistSnapshot = nextSnapshot;
+    } catch (_error) {
+      // Ignore storage quota issues and keep the current session responsive.
+    }
+  }
+
+  async function restorePersistedPlaylistSession(): Promise<void> {
+    const persistedSession = readPersistedPlaylistSession();
+
+    if (!persistedSession) {
+      persistenceReady = true;
+      lastPersistedPlaylistSnapshot = safeSerializePersistedPlaylistSession();
+      return;
+    }
+
+    try {
+      await electronAudioAPI.restorePersistedAudioFiles?.();
+    } catch (_error) {
+      // Ignore restore failures and continue with the in-memory defaults.
+    }
+
+    const normalizedState = normalizePersistedPlaylistState(persistedSession.playlistState);
+
+    if (normalizedState) {
+      playlistManager.hydrateState(normalizedState);
+      shuffleEnabled = persistedSession.shuffleEnabled;
+      repeatMode = persistedSession.repeatMode;
+      openMenuSongId = null;
+    }
+
+    persistenceReady = true;
+    lastPersistedPlaylistSnapshot = safeSerializePersistedPlaylistSession();
+  }
+
+  function clearArmedPlaylistDragRow(): void {
+    if (!armedDragRow) {
+      return;
+    }
+
+    armedDragRow.draggable = false;
+    armedDragRow = null;
+  }
+
+  function clearPlaylistDropIndicator(): void {
+    if (!activeDropIndicator) {
+      return;
+    }
+
+    activeDropIndicator.row.classList.remove('is-drop-target-before', 'is-drop-target-after');
+    activeDropIndicator = null;
+  }
+
+  function clearPlaylistDragState(): void {
+    elements.playlist.querySelectorAll<HTMLLIElement>('.playlist-row.is-dragging').forEach((row) => {
+      row.classList.remove('is-dragging');
+      row.draggable = false;
+    });
+
+    clearPlaylistDropIndicator();
+    clearArmedPlaylistDragRow();
+    draggedPlaylistSongIndex = null;
+  }
+
+  function resolveDropPosition(row: HTMLLIElement, clientY: number): PlaylistDropPosition {
+    const { top, height } = row.getBoundingClientRect();
+    return clientY >= top + height / 2 ? 'after' : 'before';
+  }
+
+  function applyPlaylistDropIndicator(
+    row: HTMLLIElement,
+    position: PlaylistDropPosition
+  ): void {
+    if (activeDropIndicator?.row === row && activeDropIndicator.position === position) {
+      return;
+    }
+
+    clearPlaylistDropIndicator();
+    row.classList.add(position === 'before' ? 'is-drop-target-before' : 'is-drop-target-after');
+    activeDropIndicator = { row, position };
+  }
+
+  function calculateDropIndex(
+    fromIndex: number,
+    targetIndex: number,
+    position: PlaylistDropPosition,
+    listLength: number
+  ): number {
+    let nextIndex = targetIndex;
+
+    if (fromIndex < targetIndex) {
+      nextIndex = position === 'before' ? targetIndex - 1 : targetIndex;
+    } else if (fromIndex > targetIndex) {
+      nextIndex = position === 'before' ? targetIndex : targetIndex + 1;
+    }
+
+    return Math.max(0, Math.min(nextIndex, listLength - 1));
+  }
+
   function wireEvents(): void {
     window.addEventListener('beforeunload', () => {
+      persistPlaylistState(true);
       waveformController.destroy();
       youtubePlayerView.destroy();
       stopYoutubeProgressLoop();
@@ -322,26 +607,8 @@ document.addEventListener('DOMContentLoaded', () => {
       void pickFilesAndAdd('end');
     });
 
-    elements.addStartButton.addEventListener('click', () => {
-      void pickFilesAndAdd('start');
-    });
-
     elements.addFolderButton.addEventListener('click', () => {
       void pickFolderAndCreatePlaylist();
-    });
-
-    elements.insertAtPositionButton.addEventListener('click', () => {
-      const activeList = getActiveList();
-      const insertIndex = readOneBasedPosition(
-        elements.insertPosition,
-        (activeList ? activeList.length : 0) + 1
-      );
-
-      if (insertIndex === null) {
-        return;
-      }
-
-      void pickFilesAndAdd('position', insertIndex);
     });
 
     elements.createPlaylistButton.addEventListener('click', () => {
@@ -470,6 +737,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     elements.playlist.addEventListener('click', handlePlaylistClick);
+    elements.playlist.addEventListener('pointerdown', handlePlaylistPointerDown);
+    elements.playlist.addEventListener('dragstart', handlePlaylistDragStart);
+    elements.playlist.addEventListener('dragover', handlePlaylistDragOver);
+    elements.playlist.addEventListener('drop', handlePlaylistDrop);
+    elements.playlist.addEventListener('dragend', handlePlaylistDragEnd);
+    document.addEventListener('pointerup', handlePointerUp);
     document.querySelectorAll<HTMLButtonElement>('[data-scroll-target]').forEach((button) => {
       button.addEventListener('click', () => {
         handleQuickNavClick(button);
@@ -784,7 +1057,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPlaylists();
     renderPlaylist();
     syncPlayerInfo();
-    updatePositionInputs();
 
     if (announce) {
       const activePlaylist = getActivePlaylistRecord();
@@ -817,6 +1089,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = event.target instanceof Element ? event.target : null;
 
     if (!target) {
+      return;
+    }
+
+    if (target.closest('[data-drag-handle]')) {
+      event.preventDefault();
       return;
     }
 
@@ -876,6 +1153,168 @@ document.addEventListener('DOMContentLoaded', () => {
 
     openMenuSongId = null;
     playlistActions.loadSongFromActivePlaylist({ autoplay: true });
+  }
+
+  function handlePlaylistPointerDown(event: PointerEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+
+    if (!target?.closest('[data-drag-handle]')) {
+      clearArmedPlaylistDragRow();
+      return;
+    }
+
+    const row = target.closest<HTMLLIElement>('.playlist-row');
+
+    if (!row) {
+      return;
+    }
+
+    clearArmedPlaylistDragRow();
+    row.draggable = true;
+    armedDragRow = row;
+  }
+
+  function handlePointerUp(): void {
+    if (draggedPlaylistSongIndex === null) {
+      clearArmedPlaylistDragRow();
+    }
+  }
+
+  function handlePlaylistDragStart(event: DragEvent): void {
+    const row = event.target instanceof HTMLLIElement ? event.target : null;
+
+    if (!row?.classList.contains('playlist-row') || row !== armedDragRow) {
+      event.preventDefault();
+      return;
+    }
+
+    if (searchTerm) {
+      event.preventDefault();
+      clearPlaylistDragState();
+      setFeedback('Limpia la busqueda para reordenar la playlist.', 'error');
+      return;
+    }
+
+    const activePlaylist = getActivePlaylistRecord();
+
+    if (!activePlaylist || activePlaylist.list.length < 2) {
+      event.preventDefault();
+      clearPlaylistDragState();
+      return;
+    }
+
+    draggedPlaylistSongIndex = Number(row.dataset.songIndex);
+
+    if (!Number.isInteger(draggedPlaylistSongIndex)) {
+      event.preventDefault();
+      clearPlaylistDragState();
+      return;
+    }
+
+    row.classList.add('is-dragging');
+
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', row.dataset.songId || '');
+    }
+  }
+
+  function handlePlaylistDragOver(event: DragEvent): void {
+    if (draggedPlaylistSongIndex === null) {
+      return;
+    }
+
+    const row = event.target instanceof Element
+      ? event.target.closest<HTMLLIElement>('.playlist-row')
+      : null;
+
+    if (!row) {
+      clearPlaylistDropIndicator();
+      return;
+    }
+
+    const targetIndex = Number(row.dataset.songIndex);
+
+    if (!Number.isInteger(targetIndex) || targetIndex === draggedPlaylistSongIndex) {
+      clearPlaylistDropIndicator();
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+
+    applyPlaylistDropIndicator(row, resolveDropPosition(row, event.clientY));
+  }
+
+  function handlePlaylistDrop(event: DragEvent): void {
+    if (draggedPlaylistSongIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const targetRow = event.target instanceof Element
+      ? event.target.closest<HTMLLIElement>('.playlist-row')
+      : null;
+    const activePlaylist = getActivePlaylistRecord();
+
+    if (!targetRow || !activePlaylist) {
+      clearPlaylistDragState();
+      return;
+    }
+
+    const targetIndex = Number(targetRow.dataset.songIndex);
+
+    if (!Number.isInteger(targetIndex)) {
+      clearPlaylistDragState();
+      return;
+    }
+
+    const dropPosition =
+      activeDropIndicator?.row === targetRow
+        ? activeDropIndicator.position
+        : resolveDropPosition(targetRow, event.clientY);
+    const nextIndex = calculateDropIndex(
+      draggedPlaylistSongIndex,
+      targetIndex,
+      dropPosition,
+      activePlaylist.list.length
+    );
+
+    if (nextIndex === draggedPlaylistSongIndex) {
+      clearPlaylistDragState();
+      return;
+    }
+
+    const draggedSong = activePlaylist.list.getAt(draggedPlaylistSongIndex);
+    const reordered = playlistManager.reorderSongInPlaylist(
+      activePlaylist.id,
+      draggedPlaylistSongIndex,
+      nextIndex
+    );
+
+    clearPlaylistDragState();
+
+    if (!reordered) {
+      setFeedback('No fue posible reordenar la cancion en la playlist.', 'error');
+      return;
+    }
+
+    openMenuSongId = null;
+    renderPlaylist();
+    syncPlayerInfo();
+    schedulePlaylistStatePersistence();
+
+    if (draggedSong) {
+      setFeedback(`"${draggedSong.title}" cambio de posicion.`, 'success');
+    }
+  }
+
+  function handlePlaylistDragEnd(): void {
+    clearPlaylistDragState();
   }
 
   function handleDocumentClick(event: MouseEvent): void {
@@ -1379,7 +1818,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPlaylists();
     renderPlaylist();
     syncPlayerInfo();
-    updatePositionInputs();
 
     if (result.added.length === 0) {
       setFeedback(
@@ -1430,7 +1868,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPlaylists();
     renderPlaylist();
     syncPlayerInfo();
-    updatePositionInputs();
     setFeedback(`"${track.title}" fue agregada a "${playlist.name}" desde YouTube.`, 'success');
   }
 
@@ -1991,6 +2428,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activePlaylistId: playlistManager.activePlaylistId,
     });
     youtubeSearchView.syncPlaylistTargets(playlists, playlistManager.activePlaylistId);
+    schedulePlaylistStatePersistence();
   }
 
   function renderPlaylist(): void {
@@ -2016,6 +2454,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.playlist.hidden = isEmpty;
     elements.playlistEmptyState.hidden = !isEmpty;
     renderNodeVisualizer();
+    schedulePlaylistStatePersistence();
   }
 
   function renderNodeVisualizer(): void {
@@ -2201,6 +2640,7 @@ document.addEventListener('DOMContentLoaded', () => {
       repeatLabel: repeatModeLabels[repeatMode],
       modeSummary: getModeSummaryLabel(),
     });
+    schedulePlaylistStatePersistence();
   }
 
   function setPlayButtonState(isPlaying: boolean): void {
@@ -2208,17 +2648,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updatePositionInputs(): void {
-    const activeList = getActiveList();
-    const insertMax = Math.max((activeList ? activeList.length : 0) + 1, 1);
-
-    elements.insertPosition.max = String(insertMax);
-
-    if (
-      Number(elements.insertPosition.value) > insertMax ||
-      Number(elements.insertPosition.value) < 1
-    ) {
-      elements.insertPosition.value = String(insertMax);
-    }
+    // The old insert-position controls were removed in favor of drag and drop.
   }
 
   function updatePlaybackProgress(): void {
@@ -2252,18 +2682,6 @@ document.addEventListener('DOMContentLoaded', () => {
     nowPlayingView.syncPlaybackPosition(
       Number.isFinite(elements.audioElement.currentTime) ? elements.audioElement.currentTime : null
     );
-  }
-
-  function readOneBasedPosition(inputElement: HTMLInputElement, maxValue: number): number | null {
-    const rawValue = Number(inputElement.value);
-    const allowedMax = Math.max(maxValue, 1);
-
-    if (!Number.isInteger(rawValue) || rawValue < 1 || rawValue > allowedMax) {
-      setFeedback(`La posicion debe estar entre 1 y ${allowedMax}.`, 'error');
-      return null;
-    }
-
-    return rawValue - 1;
   }
 
   function getNextRepeatMode(currentMode: RepeatMode): RepeatMode {

@@ -104,6 +104,32 @@ class DoublyLinkedPlaylist<TTrack extends Track = Track> {
     return position;
   }
 
+  moveAt(fromPosition: number, toPosition: number): number {
+    if (
+      fromPosition < 0 ||
+      fromPosition >= this.length ||
+      toPosition < 0 ||
+      toPosition >= this.length
+    ) {
+      throw new RangeError('Invalid move position.');
+    }
+
+    if (fromPosition === toPosition) {
+      return toPosition;
+    }
+
+    const node = this.getNodeAt(fromPosition);
+
+    if (!node) {
+      throw new RangeError('Invalid move position.');
+    }
+
+    this.detachNode(node);
+    this.insertDetachedNodeAt(node, toPosition);
+
+    return toPosition;
+  }
+
   removeAt(position: number): TTrack {
     if (position < 0 || position >= this.length) {
       throw new RangeError('Invalid remove position.');
@@ -251,6 +277,73 @@ class DoublyLinkedPlaylist<TTrack extends Track = Track> {
     }
 
     return currentNode;
+  }
+
+  detachNode(node: PlaylistNode<TTrack>): void {
+    if (node.prev) {
+      node.prev.next = node.next;
+    } else {
+      this.head = node.next;
+    }
+
+    if (node.next) {
+      node.next.prev = node.prev;
+    } else {
+      this.tail = node.prev;
+    }
+
+    node.prev = null;
+    node.next = null;
+    this.length -= 1;
+  }
+
+  insertDetachedNodeAt(node: PlaylistNode<TTrack>, position: number): void {
+    if (position < 0 || position > this.length) {
+      throw new RangeError('Invalid insert position.');
+    }
+
+    if (this.length === 0) {
+      this.head = node;
+      this.tail = node;
+      this.length = 1;
+      return;
+    }
+
+    if (position === 0) {
+      node.next = this.head;
+
+      if (this.head) {
+        this.head.prev = node;
+      }
+
+      this.head = node;
+      this.length += 1;
+      return;
+    }
+
+    if (position === this.length) {
+      node.prev = this.tail;
+
+      if (this.tail) {
+        this.tail.next = node;
+      }
+
+      this.tail = node;
+      this.length += 1;
+      return;
+    }
+
+    const nextNode = this.getNodeAt(position);
+
+    if (!nextNode || !nextNode.prev) {
+      throw new RangeError('Invalid insert position.');
+    }
+
+    node.prev = nextNode.prev;
+    node.next = nextNode;
+    nextNode.prev.next = node;
+    nextNode.prev = node;
+    this.length += 1;
   }
 
   toArray(): Array<TTrack & { index: number; isCurrent: boolean }> {

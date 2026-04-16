@@ -4,10 +4,7 @@ type LyricsPanelKind = 'original' | 'translated';
 interface RendererElements {
   sidebarToggleButton: HTMLButtonElement;
   addEndButton: HTMLButtonElement;
-  addStartButton: HTMLButtonElement;
   addFolderButton: HTMLButtonElement;
-  insertPosition: HTMLInputElement;
-  insertAtPositionButton: HTMLButtonElement;
   feedbackMessage: HTMLParagraphElement;
   newPlaylistName: HTMLInputElement;
   createPlaylistButton: HTMLButtonElement;

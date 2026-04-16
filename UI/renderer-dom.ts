@@ -15,10 +15,7 @@ function createRendererElements(documentRef: Document): RendererElements {
   return {
     sidebarToggleButton: requireElement<HTMLButtonElement>(documentRef, 'sidebarToggleButton'),
     addEndButton: requireElement<HTMLButtonElement>(documentRef, 'addEndButton'),
-    addStartButton: requireElement<HTMLButtonElement>(documentRef, 'addStartButton'),
     addFolderButton: requireElement<HTMLButtonElement>(documentRef, 'addFolderButton'),
-    insertPosition: requireElement<HTMLInputElement>(documentRef, 'insertPosition'),
-    insertAtPositionButton: requireElement<HTMLButtonElement>(documentRef, 'insertAtPositionButton'),
     feedbackMessage: requireElement<HTMLParagraphElement>(documentRef, 'feedbackMessage'),
     newPlaylistName: requireElement<HTMLInputElement>(documentRef, 'newPlaylistName'),
     createPlaylistButton: requireElement<HTMLButtonElement>(documentRef, 'createPlaylistButton'),

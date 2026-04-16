@@ -111,6 +111,7 @@ class PlaylistView {
       const favoriteButton = this.documentRef.createElement('button');
       const menuButton = this.documentRef.createElement('button');
       const indexCell = this.documentRef.createElement('div');
+      const dragHandle = this.documentRef.createElement('div');
       const number = this.documentRef.createElement('span');
       const art = this.documentRef.createElement('div');
       const titleCell = this.documentRef.createElement('div');
@@ -126,12 +127,18 @@ class PlaylistView {
       const isHighlighted = isPlayingSong || song.isCurrent;
 
       row.className = 'playlist-row';
+      row.dataset.songIndex = String(song.index);
+      row.dataset.songId = song.id;
 
       songButton.type = 'button';
       songButton.className = `playlist-item${isHighlighted ? ' is-current' : ''}`;
       songButton.dataset.index = String(song.index);
 
       indexCell.className = 'playlist-index';
+      dragHandle.className = 'playlist-drag-handle';
+      dragHandle.dataset.dragHandle = 'true';
+      dragHandle.title = 'Arrastrar para reordenar';
+      dragHandle.setAttribute('aria-hidden', 'true');
       number.className = 'playlist-number';
       number.textContent = String(song.index + 1);
 
@@ -193,6 +200,7 @@ class PlaylistView {
       menuButton.setAttribute('aria-label', 'Mas acciones');
       menuButton.textContent = '...';
 
+      indexCell.appendChild(dragHandle);
       indexCell.appendChild(number);
       indexCell.appendChild(art);
 

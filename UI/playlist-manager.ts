@@ -128,6 +128,25 @@ class PlaylistManager<TTrack extends Track = Track> {
     return this.activePlaylistId ? this.getPlaylist(this.activePlaylistId) : null;
   }
 
+  resetState(): void {
+    this.playlists.clear();
+    this.playlistOrder = [];
+    this.songLibraryById.clear();
+    this.songLibraryByKey.clear();
+    this.activePlaylistId = null;
+
+    this.createPlaylist('Playlist principal', {
+      id: 'main',
+      system: false,
+    });
+    this.createPlaylist('Mis favoritos', {
+      id: 'favorites',
+      system: true,
+      favorites: true,
+    });
+    this.setActivePlaylist('main');
+  }
+
   setActivePlaylist(playlistId: string): boolean {
     if (!this.playlists.has(playlistId)) {
       return false;
@@ -278,6 +297,21 @@ class PlaylistManager<TTrack extends Track = Track> {
     return { added, duplicates };
   }
 
+  reorderSongInPlaylist(playlistId: string, fromIndex: number, toIndex: number): boolean {
+    const playlist = this.getPlaylist(playlistId);
+
+    if (!playlist) {
+      return false;
+    }
+
+    try {
+      playlist.list.moveAt(fromIndex, toIndex);
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   removeSongFromPlaylist(playlistId: string, songId: string): TTrack | null {
     const playlist = this.getPlaylist(playlistId);
     const songIndex = this.findSongIndex(playlistId, songId);
@@ -341,6 +375,111 @@ class PlaylistManager<TTrack extends Track = Track> {
     if (!song.isFavorite && favoritesIndex !== -1) {
       favoritesPlaylist.list.removeAt(favoritesIndex);
     }
+  }
+
+  exportState(): PersistedPlaylistState<TTrack> {
+    return {
+      songs: Array.from(this.songLibraryById.values()).map((song) => ({ ...song })),
+      playlists: this.getPlaylists().map((playlist) => ({
+        id: playlist.id,
+        name: playlist.name,
+        isSystem: playlist.isSystem,
+        isFavorites: playlist.isFavorites,
+        songIds: playlist.list.toArray().map((song) => song.id),
+        currentSongId: playlist.list.getCurrentSong()?.id || null,
+      })),
+      activePlaylistId: this.activePlaylistId,
+    };
+  }
+
+  hydrateState(state: PersistedPlaylistState<TTrack>): boolean {
+    if (
+      !state ||
+      !Array.isArray(state.songs) ||
+      !Array.isArray(state.playlists)
+    ) {
+      return false;
+    }
+
+    this.resetState();
+
+    const songMap = new Map<string, TTrack>();
+
+    state.songs.forEach((songData) => {
+      if (!songData?.id) {
+        return;
+      }
+
+      const canonicalSong = this.getOrCreateSong(songData);
+      songMap.set(canonicalSong.id, canonicalSong);
+    });
+
+    this.playlists.clear();
+    this.playlistOrder = [];
+
+    state.playlists.forEach((playlistState) => {
+      if (!playlistState?.id || !playlistState?.name) {
+        return;
+      }
+
+      this.createPlaylist(playlistState.name, {
+        id: playlistState.id,
+        system: playlistState.isSystem,
+        favorites: playlistState.isFavorites,
+      });
+    });
+
+    const hasMainPlaylist = this.playlists.has('main');
+    const hasFavoritesPlaylist = this.playlists.has('favorites');
+
+    if (!hasMainPlaylist) {
+      this.createPlaylist('Playlist principal', {
+        id: 'main',
+        system: false,
+      });
+    }
+
+    if (!hasFavoritesPlaylist) {
+      this.createPlaylist('Mis favoritos', {
+        id: 'favorites',
+        system: true,
+        favorites: true,
+      });
+    }
+
+    state.playlists.forEach((playlistState) => {
+      const playlist = this.getPlaylist(playlistState.id);
+
+      if (!playlist) {
+        return;
+      }
+
+      (playlistState.songIds || []).forEach((songId) => {
+        const song = songMap.get(songId);
+
+        if (song) {
+          this.addSongToPlaylist(playlist.id, song);
+        }
+      });
+
+      if (playlistState.currentSongId) {
+        this.setCurrentSongById(playlist.id, playlistState.currentSongId);
+      } else if (!playlist.list.getCurrentSong() && !playlist.list.isEmpty()) {
+        playlist.list.setCurrentByPosition(0);
+      }
+    });
+
+    Array.from(songMap.values()).forEach((song) => {
+      if (song.isFavorite) {
+        this.syncFavoritesMembership(song);
+      }
+    });
+
+    if (!this.setActivePlaylist(state.activePlaylistId || 'main')) {
+      this.setActivePlaylist('main');
+    }
+
+    return true;
   }
 }
 

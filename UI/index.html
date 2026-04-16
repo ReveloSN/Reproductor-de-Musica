@@ -57,23 +57,10 @@
 
           <div class="action-stack">
             <button id="addEndButton" class="button button-primary">Agregar al final</button>
-            <button id="addStartButton" class="button button-secondary">
-              Agregar al inicio
-            </button>
             <button id="addFolderButton" class="button button-secondary">
               Cargar carpeta como playlist
             </button>
           </div>
-
-          <label class="field" for="insertPosition">
-            <span>Insertar en posicion</span>
-            <div class="field-row">
-              <input id="insertPosition" type="number" min="1" value="1" />
-              <button id="insertAtPositionButton" class="button button-secondary">
-                Insertar
-              </button>
-            </div>
-          </label>
 
           <div class="format-chips">
             <span>MP3</span>
@@ -81,6 +68,10 @@
             <span>OGG</span>
             <span>M4A</span>
           </div>
+
+          <p class="playlist-dnd-note">
+            Reordena canciones arrastrandolas desde la lista cuando ya esten cargadas.
+          </p>
 
           <p id="feedbackMessage" class="feedback" role="status" aria-live="polite">
             Todo listo para cargar tu musica.
@@ -323,6 +314,9 @@
                 <h3 id="playlistPanelTitle">Playlist principal</h3>
                 <p id="playlistResultsLabel" class="playlist-results">
                   Mostrando 0 canciones
+                </p>
+                <p class="playlist-results-hint">
+                  Arrastra desde el icono punteado para cambiar el orden sin perder la reproduccion.
                 </p>
               </div>
             </div>

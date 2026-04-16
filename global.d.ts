@@ -71,6 +71,21 @@ interface PlaylistRecord<TTrack extends Track = Track> {
   isFavorites: boolean;
 }
 
+interface PersistedPlaylistRecord {
+  id: string;
+  name: string;
+  isSystem: boolean;
+  isFavorites: boolean;
+  songIds: string[];
+  currentSongId: string | null;
+}
+
+interface PersistedPlaylistState<TTrack extends Track = Track> {
+  songs: TTrack[];
+  playlists: PersistedPlaylistRecord[];
+  activePlaylistId: string | null;
+}
+
 type LookupStatus = 'available' | 'empty' | 'error';
 type RepeatMode = 'off' | 'one' | 'all';
 
@@ -182,6 +197,7 @@ interface AudioAPI {
   extname: (filePath: string) => string;
   readAudioMetadata: (filePath: string) => Promise<AudioFileMetadata>;
   readAudioBlob?: (filePath: string) => Promise<Blob | null>;
+  restorePersistedAudioFiles?: () => Promise<string[]>;
   fetchLyrics: (query: LyricsLookupQuery) => Promise<LyricsResult>;
 }
 
