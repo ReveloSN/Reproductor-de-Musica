@@ -89,8 +89,8 @@ class YoutubeSearchView {
   renderConfig(config: YouTubeConfig): void {
     this.elements.youtubeApiStatus.textContent = config.message;
     this.elements.youtubeApiStatus.dataset.state = config.isConfigured ? 'ready' : 'error';
-    this.elements.youtubeSearchInput.disabled = !config.isConfigured;
-    this.elements.youtubeSearchButton.disabled = !config.isConfigured;
+    this.elements.youtubeSearchInput.disabled = false;
+    this.elements.youtubeSearchButton.disabled = false;
 
     if (!config.isConfigured) {
       this.setSearchState('error', config.message);

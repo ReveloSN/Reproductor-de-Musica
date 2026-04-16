@@ -201,6 +201,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.youtubePlayerSurface.dataset.state = 'error';
     elements.youtubeSearchInput.disabled = true;
     elements.youtubeSearchButton.disabled = true;
+    elements.youtubeApiKeyInput.disabled = false;
+    elements.youtubeSaveKeyButton.disabled = false;
     elements.youtubeResults.replaceChildren();
   }
 
