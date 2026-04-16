@@ -24,6 +24,7 @@ class YoutubePlayerView {
   suppressEndedCallback: boolean;
   pendingAutoplay: boolean;
   pendingUnmute: boolean;
+  isTrackTransitioning: boolean;
 
   constructor(documentRef: Document, elements: RendererElements, options: YoutubePlayerViewOptions) {
     this.documentRef = documentRef;
@@ -37,6 +38,7 @@ class YoutubePlayerView {
     this.suppressEndedCallback = false;
     this.pendingAutoplay = false;
     this.pendingUnmute = false;
+    this.isTrackTransitioning = false;
 
     this.setUiState('idle', 'Selecciona un video de YouTube para reproducirlo aqui.', false);
     this.elements.youtubePlayerTitle.textContent = 'Player de YouTube';
@@ -54,9 +56,10 @@ class YoutubePlayerView {
 
     const token = ++this.loadToken;
     this.currentTrack = track;
-    this.suppressEndedCallback = false;
+    this.suppressEndedCallback = Boolean(this.player);
     this.pendingAutoplay = autoplay;
     this.pendingUnmute = autoplay;
+    this.isTrackTransitioning = true;
     this.syncTrackCopy(track);
     this.syncFallbackButton(track);
     this.setUiState('loading', `Cargando "${track.title}" en el reproductor de YouTube...`);
@@ -91,6 +94,7 @@ class YoutubePlayerView {
 
       return true;
     } catch (error) {
+      this.isTrackTransitioning = false;
       const message = error instanceof Error ? error.message : String(error);
       this.setUiState('error', `No fue posible iniciar el player de YouTube: ${message}`);
       return false;
@@ -144,6 +148,7 @@ class YoutubePlayerView {
     this.suppressEndedCallback = false;
     this.pendingAutoplay = false;
     this.pendingUnmute = false;
+    this.isTrackTransitioning = false;
 
     if (this.player) {
       this.player.destroy();
@@ -250,6 +255,7 @@ class YoutubePlayerView {
     }
 
     if (playerState === states.PLAYING) {
+      this.isTrackTransitioning = false;
       this.suppressEndedCallback = false;
       this.pendingAutoplay = false;
 
@@ -273,6 +279,10 @@ class YoutubePlayerView {
     }
 
     if (playerState === states.PAUSED) {
+      if (this.isTrackTransitioning) {
+        return;
+      }
+
       this.suppressEndedCallback = false;
       this.pendingAutoplay = false;
       this.pendingUnmute = false;
@@ -281,6 +291,10 @@ class YoutubePlayerView {
     }
 
     if (playerState === states.ENDED) {
+      if (this.isTrackTransitioning) {
+        return;
+      }
+
       this.setUiState('ended', 'El video termino.');
 
       if (this.suppressEndedCallback) {
@@ -306,6 +320,7 @@ class YoutubePlayerView {
         return;
       }
 
+      this.isTrackTransitioning = false;
       this.pendingAutoplay = false;
       this.pendingUnmute = false;
       this.setUiState('ready', 'Video listo para reproducirse.');
