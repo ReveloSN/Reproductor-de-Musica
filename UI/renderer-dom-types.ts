@@ -23,8 +23,6 @@ interface RendererElements {
   currentSongTitle: HTMLHeadingElement;
   currentSongMeta: HTMLParagraphElement;
   playbackStatus: HTMLSpanElement;
-  shuffleStateLabel: HTMLSpanElement;
-  repeatStateLabel: HTMLSpanElement;
   youtubeSearchInput: HTMLInputElement;
   youtubeSearchButton: HTMLButtonElement;
   youtubeSearchStatus: HTMLParagraphElement;

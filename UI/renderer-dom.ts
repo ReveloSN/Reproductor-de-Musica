@@ -34,8 +34,6 @@ function createRendererElements(documentRef: Document): RendererElements {
     currentSongTitle: requireElement<HTMLHeadingElement>(documentRef, 'currentSongTitle'),
     currentSongMeta: requireElement<HTMLParagraphElement>(documentRef, 'currentSongMeta'),
     playbackStatus: requireElement<HTMLSpanElement>(documentRef, 'playbackStatus'),
-    shuffleStateLabel: requireElement<HTMLSpanElement>(documentRef, 'shuffleStateLabel'),
-    repeatStateLabel: requireElement<HTMLSpanElement>(documentRef, 'repeatStateLabel'),
     youtubeSearchInput: requireElement<HTMLInputElement>(documentRef, 'youtubeSearchInput'),
     youtubeSearchButton: requireElement<HTMLButtonElement>(documentRef, 'youtubeSearchButton'),
     youtubeSearchStatus: requireElement<HTMLParagraphElement>(documentRef, 'youtubeSearchStatus'),

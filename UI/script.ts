@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activePlaybackSongId: string | null = null;
   let activePlaybackSource: TrackSource | null = null;
   let youtubeProgressTimer: number | null = null;
+  let songAdvanceTimer: number | null = null;
   let mutedVolume: number | null = null;
   let lastNonMutedVolume = 70;
   let persistenceReady = false;
@@ -720,6 +721,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setFeedback('No hay una cancion activa para detener.', 'error');
         return;
       }
+
+      clearSongAdvanceTimer();
 
       if (currentSong.source === 'youtube') {
         youtubePlayerView.stop();
@@ -1932,6 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function clearPlayback(): void {
+    clearSongAdvanceTimer();
     activePlaybackSongId = null;
     activePlaybackSource = null;
     stopYoutubeProgressLoop();
@@ -1943,6 +1947,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function playTrack(song: Track, { autoplay = true, announce = true }: LoadSongOptions = {}): void {
+    clearSongAdvanceTimer();
+
     if (song.source === 'youtube') {
       void playYouTubeTrack(song, { autoplay, announce });
       return;
@@ -2327,11 +2333,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return null;
   }
 
-  function handleSongEnded(): void {
-    if (playNextSong({ fromEnded: true, announce: false })) {
+  function clearSongAdvanceTimer(): void {
+    if (songAdvanceTimer === null) {
       return;
     }
 
+    window.clearTimeout(songAdvanceTimer);
+    songAdvanceTimer = null;
+  }
+
+  function finalizePlaylistAfterEnd(): void {
     if (activePlaybackSource === 'youtube') {
       stopYoutubeProgressLoop();
       youtubePlayerView.seekTo(0);
@@ -2346,6 +2357,38 @@ document.addEventListener('DOMContentLoaded', () => {
     setFeedback('La playlist activa termino. Ya no hay una siguiente cancion.', 'success');
     renderPlaylist();
     syncPlayerInfo();
+  }
+
+  function handleSongEnded(): void {
+    const endedSongId = activePlaybackSongId;
+    const endedSource = activePlaybackSource;
+
+    clearSongAdvanceTimer();
+    songAdvanceTimer = window.setTimeout(() => {
+      songAdvanceTimer = null;
+
+      if (
+        endedSongId &&
+        activePlaybackSongId &&
+        activePlaybackSongId !== endedSongId
+      ) {
+        return;
+      }
+
+      if (
+        endedSource &&
+        activePlaybackSource &&
+        activePlaybackSource !== endedSource
+      ) {
+        return;
+      }
+
+      if (playNextSong({ fromEnded: true, announce: false })) {
+        return;
+      }
+
+      finalizePlaylistAfterEnd();
+    }, 90);
   }
 
   function handleSongMenuAction(action: SongMenuAction, index: number): void {
@@ -2564,8 +2607,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     elements.playlistDurationLabel.textContent = `Duracion conocida: ${formatDuration(knownDuration)}`;
     elements.modeSummaryChip.textContent = modeSummary;
-    elements.shuffleStateLabel.textContent = shuffleEnabled ? 'Shuffle on' : 'Shuffle off';
-    elements.repeatStateLabel.textContent = repeatModeLabels[repeatMode];
 
     if (!displaySong) {
       elements.currentSongTitle.textContent = 'Sin canciones cargadas';

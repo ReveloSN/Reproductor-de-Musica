@@ -104,8 +104,6 @@ class PlaybackController {
     this.elements.repeatIndicator.textContent = repeatIndicator;
     this.elements.expandedRepeatIndicator.textContent = repeatIndicator;
     this.elements.modeSummaryChip.textContent = modeSummary;
-    this.elements.shuffleStateLabel.textContent = shuffleEnabled ? 'Shuffle on' : 'Shuffle off';
-    this.elements.repeatStateLabel.textContent = repeatLabel;
     this.elements.expandedModeSummary.textContent = modeSummary;
   }
 
