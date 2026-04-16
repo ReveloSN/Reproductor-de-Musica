@@ -28,6 +28,7 @@ interface YouTubeSearchViewLike {
 interface YouTubePlayerViewLike {
   currentTrack: Track | null;
   loadTrack: (track: Track, options?: { autoplay?: boolean }) => Promise<boolean>;
+  deactivate: () => void;
   play: () => void;
   pause: () => void;
   stop: () => void;
@@ -189,6 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
           elements.youtubePlayerStatus.textContent =
             'El player de YouTube no esta disponible en esta sesion.';
           return false;
+        },
+        deactivate: () => {
+          // The YouTube module is unavailable in this session.
         },
         play: () => {
           // The YouTube module is unavailable in this session.
@@ -1942,7 +1946,7 @@ document.addEventListener('DOMContentLoaded', () => {
     suppressPauseStatus();
     elements.audioElement.pause();
     playbackController.clearSource();
-    youtubePlayerView.stop();
+    youtubePlayerView.deactivate();
     updatePlaybackProgress();
   }
 
@@ -1958,10 +1962,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function playLocalTrack(song: Track, { autoplay = true, announce = true }: LoadSongOptions = {}): void {
-    stopYoutubeProgressLoop();
-    youtubePlayerView.pause();
     activePlaybackSongId = song.id;
     activePlaybackSource = 'local';
+    stopYoutubeProgressLoop();
+    youtubePlayerView.deactivate();
     playbackController.syncCurrentSong(song);
     renderPlaylists();
     renderPlaylist();

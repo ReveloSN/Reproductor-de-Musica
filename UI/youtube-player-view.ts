@@ -107,6 +107,29 @@ class YoutubePlayerView {
     }
   }
 
+  deactivate(): void {
+    this.loadToken += 1;
+    this.currentTrack = null;
+    this.suppressEndedCallback = true;
+    this.pendingAutoplay = false;
+    this.pendingUnmute = false;
+    this.isTrackTransitioning = false;
+
+    if (this.player) {
+      try {
+        this.player.stopVideo();
+      } catch (_error) {
+        // Ignore stop errors when releasing the iframe player.
+      }
+    }
+
+    this.elements.youtubePlayerTitle.textContent = 'Player de YouTube';
+    this.elements.youtubePlayerMeta.textContent =
+      'Selecciona un resultado de YouTube para intentar reproducirlo aqui.';
+    this.syncFallbackButton(null);
+    this.setUiState('idle', 'YouTube en espera mientras suena audio local.', false);
+  }
+
   pause(): void {
     if (this.player) {
       this.player.pauseVideo();
@@ -251,6 +274,10 @@ class YoutubePlayerView {
     const states = window.YT?.PlayerState;
 
     if (!states) {
+      return;
+    }
+
+    if (!this.currentTrack) {
       return;
     }
 
