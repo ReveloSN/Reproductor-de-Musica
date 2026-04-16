@@ -9,6 +9,7 @@ interface PlaylistSongsRenderArgs {
   allSongs: PlaylistTrackView[];
   playingSongId: string | null;
   searchTerm: string;
+  searchLabel: string;
   openMenuSongId: string | null;
   playlistManager: PlaylistManager;
   summarizePath: (filePath: string) => string;
@@ -72,6 +73,7 @@ class PlaylistView {
     allSongs,
     playingSongId,
     searchTerm,
+    searchLabel,
     openMenuSongId,
     playlistManager,
     summarizePath,
@@ -79,7 +81,7 @@ class PlaylistView {
     this.elements.playlist.replaceChildren();
 
     this.elements.playlistResultsLabel.textContent = searchTerm
-      ? `Mostrando ${visibleSongs.length} de ${allSongs.length} canciones`
+      ? `Buscando "${searchLabel}": ${visibleSongs.length} de ${allSongs.length} canciones`
       : `Mostrando ${allSongs.length} canciones`;
 
     if (!activePlaylist || allSongs.length === 0) {

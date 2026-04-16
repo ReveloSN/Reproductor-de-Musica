@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let pauseStatusSuppressed = false;
   let searchTerm = '';
+  let searchQuery = '';
   let openMenuSongId: string | null = null;
   let shuffleEnabled = false;
   let repeatMode: RepeatMode = 'off';
@@ -381,10 +382,28 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.volumeSlider.addEventListener('input', handleVolumeSliderInput);
 
     elements.searchInput.addEventListener('input', () => {
-      searchTerm = elements.searchInput.value.trim().toLowerCase();
+      searchQuery = elements.searchInput.value.trim();
+      searchTerm = window.SongLookupUtils.normalizeText(searchQuery);
       openMenuSongId = null;
       renderPlaylist();
       syncPlayerInfo();
+    });
+    elements.searchInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        revealPlaylistSearchResults();
+        return;
+      }
+
+      if (event.key === 'Escape' && elements.searchInput.value) {
+        event.preventDefault();
+        elements.searchInput.value = '';
+        searchQuery = '';
+        searchTerm = '';
+        openMenuSongId = null;
+        renderPlaylist();
+        syncPlayerInfo();
+      }
     });
 
     elements.shuffleButton.addEventListener('click', () => {
@@ -1921,22 +1940,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return songs.filter((song) => {
-      const searchable = [
-        song.title,
-        song.artist,
-        song.channelTitle || '',
-        song.album || '',
-        song.fileName,
-        song.path,
-        song.extension,
-        song.genre || '',
-        song.sourceLabel,
-        song.youtubeUrl || '',
-      ]
-        .join(' ')
-        .toLowerCase();
+      const searchable = buildSongSearchText(song);
       return searchable.includes(searchTerm);
     });
+  }
+
+  function buildSongSearchText(song: Track): string {
+    const lookupKeys = window.SongLookupUtils.buildLookupKeys(song);
+    const searchableParts = [
+      song.title,
+      song.artist,
+      song.channelTitle || '',
+      song.album || '',
+      song.fileName,
+      song.path,
+      summarizePath(song.path),
+      song.extension,
+      song.genre || '',
+      song.sourceLabel,
+      song.youtubeUrl || '',
+      ...lookupKeys,
+    ];
+
+    return window.SongLookupUtils.normalizeText(searchableParts.join(' '));
+  }
+
+  function revealPlaylistSearchResults(): void {
+    const playlistSection = document.getElementById('playlistSection');
+
+    if (!playlistSection) {
+      return;
+    }
+
+    playlistSection.scrollIntoView({
+      block: 'start',
+      behavior: 'smooth',
+    });
+
+    window.setTimeout(() => {
+      const firstVisibleResult = elements.playlist.querySelector<HTMLButtonElement>('.playlist-item');
+      firstVisibleResult?.focus();
+    }, 260);
   }
 
   function renderPlaylists(): void {
@@ -1962,6 +2006,7 @@ document.addEventListener('DOMContentLoaded', () => {
       allSongs,
       playingSongId: playingSong ? playingSong.id : null,
       searchTerm,
+      searchLabel: searchQuery,
       openMenuSongId,
       playlistManager,
       summarizePath,
@@ -2058,6 +2103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeList = getActiveList();
     const displaySong = getDisplaySong();
     const activeSongs = activeList ? activeList.toArray() : [];
+    const visibleSongs = getVisibleSongs();
     const knownDuration = activeSongs.reduce((total, song) => {
       return total + (Number.isFinite(song.durationSeconds) ? song.durationSeconds || 0 : 0);
     }, 0);
@@ -2065,10 +2111,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (activePlaylist && activeList) {
       elements.activePlaylistTitle.textContent = activePlaylist.name;
-      elements.activePlaylistDescription.textContent = getPlaylistDescription(activePlaylist);
+      elements.activePlaylistDescription.textContent = searchTerm
+        ? `Busqueda activa: ${visibleSongs.length} de ${activeList.length} canciones en ${activePlaylist.name}.`
+        : getPlaylistDescription(activePlaylist);
       elements.playlistPanelTitle.textContent = activePlaylist.name;
-      elements.playlistSummary.textContent = `${activePlaylist.name} - ${activeList.length} canciones`;
-      elements.playlistSummaryChip.textContent = activePlaylist.name;
+      elements.playlistSummary.textContent = searchTerm
+        ? `Resultados para "${searchQuery}": ${visibleSongs.length} de ${activeList.length} canciones`
+        : `${activePlaylist.name} - ${activeList.length} canciones`;
+      elements.playlistSummaryChip.textContent = searchTerm
+        ? `${visibleSongs.length} resultado${visibleSongs.length === 1 ? '' : 's'}`
+        : activePlaylist.name;
     }
 
     elements.playlistDurationLabel.textContent = `Duracion conocida: ${formatDuration(knownDuration)}`;
