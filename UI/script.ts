@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activePlaybackSource: TrackSource | null = null;
   let youtubeProgressTimer: number | null = null;
   let songAdvanceTimer: number | null = null;
+  let localAutoplayRecoveryTimer: number | null = null;
   let mutedVolume: number | null = null;
   let lastNonMutedVolume = 70;
   let persistenceReady = false;
@@ -1940,6 +1941,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function clearPlayback(): void {
     clearSongAdvanceTimer();
+    clearLocalAutoplayRecoveryTimer();
     activePlaybackSongId = null;
     activePlaybackSource = null;
     stopYoutubeProgressLoop();
@@ -1952,6 +1954,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function playTrack(song: Track, { autoplay = true, announce = true }: LoadSongOptions = {}): void {
     clearSongAdvanceTimer();
+    clearLocalAutoplayRecoveryTimer();
 
     if (song.source === 'youtube') {
       void playYouTubeTrack(song, { autoplay, announce });
@@ -1978,29 +1981,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const playPromise = elements.audioElement.play();
-
-    if (playPromise && typeof playPromise.catch === 'function') {
-      void playPromise
-        .then(() => {
-          setPlayButtonState(true);
-          setPlaybackStatus('Reproduciendo');
-          renderPlaylist();
-          syncPlayerInfo();
-
-          if (announce) {
-            setFeedback(`Reproduciendo "${song.title}".`, 'success');
-          }
-        })
-        .catch(() => {
-          setPlayButtonState(false);
-          setPlaybackStatus('Error de audio');
-          setFeedback(
-            `Electron no pudo reproducir "${song.title}". Revisa el archivo o prueba otro formato compatible.`,
-            'error'
-          );
-        });
-    }
+    setPlaybackStatus('Cargando audio');
+    startLocalPlayback(song, { announce });
   }
 
   async function showYouTubeTrackSelection(song: Track): Promise<void> {
@@ -2123,6 +2105,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.clearInterval(youtubeProgressTimer);
     youtubeProgressTimer = null;
+  }
+
+  function clearLocalAutoplayRecoveryTimer(): void {
+    if (localAutoplayRecoveryTimer === null) {
+      return;
+    }
+
+    window.clearTimeout(localAutoplayRecoveryTimer);
+    localAutoplayRecoveryTimer = null;
+  }
+
+  function isLocalSongStillActive(song: Track): boolean {
+    return (
+      activePlaybackSource === 'local' &&
+      activePlaybackSongId === song.id &&
+      elements.audioElement.dataset.songId === song.id
+    );
+  }
+
+  function applyLocalPlaybackStarted(song: Track, announce: boolean): void {
+    setPlayButtonState(true);
+    setPlaybackStatus('Reproduciendo');
+    renderPlaylist();
+    syncPlayerInfo();
+
+    if (announce) {
+      setFeedback(`Reproduciendo "${song.title}".`, 'success');
+    }
+  }
+
+  function startLocalPlayback(
+    song: Track,
+    {
+      announce,
+      attempt = 0,
+    }: {
+      announce: boolean;
+      attempt?: number;
+    }
+  ): void {
+    if (!isLocalSongStillActive(song)) {
+      return;
+    }
+
+    clearLocalAutoplayRecoveryTimer();
+
+    const playPromise = elements.audioElement.play();
+
+    if (!playPromise || typeof playPromise.then !== 'function') {
+      applyLocalPlaybackStarted(song, announce);
+      return;
+    }
+
+    void playPromise
+      .then(() => {
+        if (!isLocalSongStillActive(song)) {
+          return;
+        }
+
+        applyLocalPlaybackStarted(song, announce);
+
+        localAutoplayRecoveryTimer = window.setTimeout(() => {
+          localAutoplayRecoveryTimer = null;
+
+          if (!isLocalSongStillActive(song)) {
+            return;
+          }
+
+          if (elements.audioElement.paused && attempt < 2) {
+            startLocalPlayback(song, {
+              announce: false,
+              attempt: attempt + 1,
+            });
+          }
+        }, 180);
+      })
+      .catch(() => {
+        if (!isLocalSongStillActive(song)) {
+          return;
+        }
+
+        if (attempt < 2) {
+          localAutoplayRecoveryTimer = window.setTimeout(() => {
+            localAutoplayRecoveryTimer = null;
+            startLocalPlayback(song, {
+              announce: false,
+              attempt: attempt + 1,
+            });
+          }, 160 + attempt * 120);
+          return;
+        }
+
+        setPlayButtonState(false);
+        setPlaybackStatus('Error de audio');
+        setFeedback(
+          `Electron no pudo reproducir "${song.title}". Revisa el archivo o prueba otro formato compatible.`,
+          'error'
+        );
+      });
   }
 
   function seekActiveTrackToStart(): void {
