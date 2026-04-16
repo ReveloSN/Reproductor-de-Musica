@@ -1743,7 +1743,6 @@ body.now-playing-open {
 }
 
 .youtube-api-status,
-.youtube-key-status,
 .youtube-search-status,
 .youtube-player-meta,
 .youtube-player-status,
@@ -1753,7 +1752,6 @@ body.now-playing-open {
 }
 
 .youtube-api-status,
-.youtube-key-status,
 .youtube-search-status,
 .youtube-player-status {
   margin: 10px 0 0;
@@ -1761,14 +1759,12 @@ body.now-playing-open {
 }
 
 .youtube-api-status[data-state='error'],
-.youtube-key-status[data-state='error'],
 .youtube-search-status[data-state='error'],
 .youtube-player-status[data-state='error'] {
   color: #ffb3a4;
 }
 
 .youtube-api-status[data-state='ready'],
-.youtube-key-status[data-state='ready'],
 .youtube-search-status[data-state='ready'],
 .youtube-search-status[data-state='loading'],
 .youtube-player-status[data-state='ready'],
@@ -1799,25 +1795,6 @@ body.now-playing-open {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-}
-
-.youtube-config-row {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.youtube-key-field {
-  min-width: 0;
-}
-
-.youtube-key-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .youtube-search-field {
@@ -2164,18 +2141,6 @@ body.now-playing-open {
 
   .youtube-search-row {
     grid-template-columns: 1fr;
-  }
-
-  .youtube-config-row {
-    grid-template-columns: 1fr;
-  }
-
-  .youtube-key-actions {
-    justify-content: stretch;
-  }
-
-  .youtube-key-actions .button {
-    width: 100%;
   }
 
   .youtube-result-card {

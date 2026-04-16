@@ -215,13 +215,13 @@ export function getYouTubeConfig(): YouTubeConfig {
     return {
       isConfigured: false,
       message:
-        'Configura YOUTUBE_API_KEY, YOUTUBE_DATA_API_KEY o GOOGLE_API_KEY antes de usar la búsqueda de YouTube.',
+        'Configura YOUTUBE_API_KEY, YOUTUBE_DATA_API_KEY o GOOGLE_API_KEY en Railway o en las variables del servidor antes de usar la búsqueda de YouTube.',
     };
   }
 
   return {
     isConfigured: true,
-    message: 'La búsqueda de YouTube está disponible con la API oficial.',
+    message: 'La búsqueda de YouTube está disponible desde la configuración del servidor.',
   };
 }
 

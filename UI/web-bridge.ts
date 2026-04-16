@@ -245,7 +245,7 @@ function buildServerManagedYouTubeKeyState(config: YouTubeConfig): YouTubeApiKey
       hasConfiguredKey: true,
       hasStoredApiKey: false,
       source: 'env',
-      message: 'La API key de YouTube se administra desde el servidor web.',
+      message: 'La API key de YouTube se administra desde Railway o desde el servidor.',
     };
   }
 
@@ -253,21 +253,8 @@ function buildServerManagedYouTubeKeyState(config: YouTubeConfig): YouTubeApiKey
     hasConfiguredKey: false,
     hasStoredApiKey: false,
     source: 'none',
-    message: 'Configura YOUTUBE_API_KEY en el servidor para habilitar la busqueda oficial de YouTube.',
+    message: 'Configura YOUTUBE_API_KEY en Railway para habilitar la busqueda oficial de YouTube.',
   };
-}
-
-function hideServerManagedYouTubeKeyControls(): void {
-  const configRow = document.querySelector<HTMLElement>('.youtube-config-row');
-  const keyStatus = document.getElementById('youtubeKeyStatus');
-
-  if (configRow) {
-    configRow.hidden = true;
-  }
-
-  if (keyStatus) {
-    keyStatus.hidden = true;
-  }
 }
 
 window.versions = {
@@ -364,14 +351,6 @@ window.aiAPI = {
     return postJson<AIPlaylistGenerateRequest, AIPlaylistResult>('/api/ai/generate', request);
   },
 };
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    hideServerManagedYouTubeKeyControls();
-  });
-} else {
-  hideServerManagedYouTubeKeyControls();
-}
 
 window.addEventListener('beforeunload', () => {
   browserFileRecords.forEach((record) => {
